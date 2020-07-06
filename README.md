@@ -1,4 +1,5 @@
-# Rustberrypui - hobby OS to hack on.  Built in Rust for raspberry pi 3
+# Rustberrypi
+Hobby OS to hack on.  Built in Rust for raspberry pi 3
 
 ## Acknowledgements
 
