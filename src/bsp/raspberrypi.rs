@@ -25,6 +25,13 @@ static PL011_UART: device_driver::PL011Uart = unsafe {
     )
 };
 
+static SYSTEM_TIMER: device_driver::SystemTimer =
+    unsafe { device_driver::SystemTimer::new(
+        memory::map::mmio::SYS_TIMER_BASE,
+        exception::asynchronous::irq_map::SYSTEM_TIMER,
+    ) 
+};
+
 static INTERRUPT_CONTROLLER: device_driver::InterruptController = unsafe {
     device_driver::InterruptController::new(
         memory::map::mmio::LOCAL_INTERRUPT_CONTROLLER_BASE,

@@ -25,7 +25,7 @@ pub struct GenericTimer;
 // Global instances
 //--------------------------------------------------------------------------------------------------
 
-static TIME_MANAGER: GenericTimer = GenericTimer;
+static TIME_MANAGER: GenericTimer = GenericTimer {};
 
 //--------------------------------------------------------------------------------------------------
 // Public Code
