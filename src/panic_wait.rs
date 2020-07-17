@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! A panic handler that infinitely waits.
-
 use crate::{bsp, cpu};
 use core::{fmt, panic::PanicInfo};
 
@@ -13,8 +7,9 @@ use core::{fmt, panic::PanicInfo};
 
 fn _panic_print(args: fmt::Arguments) {
     use fmt::Write;
+    bsp::board_name();
 
-    unsafe { bsp::console::panic_console_out().write_fmt(args).unwrap() };
+    unsafe { bsp::panic_console_out().write_fmt(args).unwrap() };
 }
 
 /// The point of exit for the "standard" (non-testing) `libkernel`.

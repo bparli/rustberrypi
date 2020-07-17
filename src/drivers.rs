@@ -1,3 +1,14 @@
+mod gpio;
+mod interrupt_controller;
+mod uart;
+mod timer;
+
+pub use gpio::*;
+pub use interrupt_controller::*;
+pub use uart::*;
+pub use timer::*;
+
+
 /// Driver interfaces.
 pub mod interface {
 

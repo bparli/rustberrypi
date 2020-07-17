@@ -1,14 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! State information about the kernel itself.
-
 use core::sync::atomic::{AtomicU8, Ordering};
-
-//--------------------------------------------------------------------------------------------------
-// Public Definitions
-//--------------------------------------------------------------------------------------------------
 
 /// Different stages in the kernel execution.
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -28,15 +18,7 @@ pub enum State {
 /// Maintains the kernel state and state transitions.
 pub struct StateManager(AtomicU8);
 
-//--------------------------------------------------------------------------------------------------
-// Global instances
-//--------------------------------------------------------------------------------------------------
-
 static STATE_MANAGER: StateManager = StateManager::new();
-
-//--------------------------------------------------------------------------------------------------
-// Public Code
-//--------------------------------------------------------------------------------------------------
 
 /// Return a reference to the global StateManager.
 pub fn state_manager() -> &'static StateManager {

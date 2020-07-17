@@ -1,19 +1,9 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! Top-level BSP file for the Raspberry Pi 3 and 4.
-
-pub mod console;
-pub mod cpu;
 pub mod driver;
 pub mod exception;
-pub mod memory;
 
-//--------------------------------------------------------------------------------------------------
-// Global instances
-//--------------------------------------------------------------------------------------------------
-use super::device_driver;
+use crate::memory;
+use crate::{bsp::device_driver, console};
+use core::fmt;
 
 static GPIO: device_driver::GPIO =
     unsafe { device_driver::GPIO::new(memory::map::mmio::GPIO_BASE) };
@@ -25,11 +15,11 @@ static PL011_UART: device_driver::PL011Uart = unsafe {
     )
 };
 
-static SYSTEM_TIMER: device_driver::SystemTimer =
-    unsafe { device_driver::SystemTimer::new(
+static SYSTEM_TIMER: device_driver::SystemTimer = unsafe {
+    device_driver::SystemTimer::new(
         memory::map::mmio::SYS_TIMER_BASE,
         exception::asynchronous::irq_map::SYSTEM_TIMER,
-    ) 
+    )
 };
 
 static INTERRUPT_CONTROLLER: device_driver::InterruptController = unsafe {
@@ -39,11 +29,31 @@ static INTERRUPT_CONTROLLER: device_driver::InterruptController = unsafe {
     )
 };
 
-//--------------------------------------------------------------------------------------------------
-// Public Code
-//--------------------------------------------------------------------------------------------------
-
 /// Board identification.
 pub fn board_name() -> &'static str {
     "Raspberry Pi 3"
 }
+
+/// In case of a panic, the panic handler uses this function to take a last shot at printing
+/// something before the system is halted.
+/// - Use only for printing during a panic.
+pub unsafe fn panic_console_out() -> impl fmt::Write {
+    let mut uart = device_driver::PanicUart::new(memory::map::mmio::PL011_UART_BASE);
+    uart.init();
+    uart
+}
+
+/// Return a reference to the console.
+pub fn console() -> &'static impl console::interface::All {
+    &PL011_UART
+}
+
+//--------------------------------------------------------------------------------------------------
+// Testing
+//--------------------------------------------------------------------------------------------------
+
+/// Minimal code needed to bring up the console in QEMU (for testing only). This is often less steps
+/// than on real hardware due to QEMU's abstractions.
+///
+/// For the RPi, nothing needs to be done.
+pub fn qemu_bring_up_console() {}

@@ -1,17 +1,6 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! Timer primitives.
-
-#[cfg(target_arch = "aarch64")]
-#[path = "_arch/aarch64/time.rs"]
+#[path = "arch/time.rs"]
 mod arch_time;
 pub use arch_time::*;
-
-//--------------------------------------------------------------------------------------------------
-// Public Definitions
-//--------------------------------------------------------------------------------------------------
 
 /// Timekeeping interfaces.
 pub mod interface {

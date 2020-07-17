@@ -1,15 +1,5 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! Rust runtime initialization code.
-
 use crate::memory;
 use core::ops::Range;
-
-//--------------------------------------------------------------------------------------------------
-// Private Code
-//--------------------------------------------------------------------------------------------------
 
 /// Return the range spanning the .bss section.
 ///
@@ -39,10 +29,6 @@ unsafe fn bss_range() -> Range<*mut usize> {
 unsafe fn zero_bss() {
     memory::zero_volatile(bss_range());
 }
-
-//--------------------------------------------------------------------------------------------------
-// Public Code
-//--------------------------------------------------------------------------------------------------
 
 /// Equivalent to `crt0` or `c0` code in C/C++ world. Clears the `bss` section, then jumps to kernel
 /// init code.

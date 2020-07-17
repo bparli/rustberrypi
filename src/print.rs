@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! Printing facilities.
-
 use crate::{bsp, console};
 use core::fmt;
 
@@ -11,11 +5,10 @@ use core::fmt;
 // Private Code
 //--------------------------------------------------------------------------------------------------
 
-#[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use console::interface::Write;
 
-    bsp::console::console().write_fmt(args).unwrap();
+    bsp::console().write_fmt(args).unwrap();
 }
 
 //--------------------------------------------------------------------------------------------------
