@@ -18,17 +18,26 @@
 mod panic_exit_success;
 
 use libkernel::{bsp, cpu, exception, memory, println};
+use linked_list_allocator::LockedHeap;
+extern crate alloc;
+
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
-    use memory::mmu::interface::MMU;
+    ALLOCATOR
+        .lock()
+        .init(memory::map::HEAP_START, memory::heap_size());
 
-    bsp::console::qemu_bring_up_console();
+    bsp::qemu_bring_up_console();
 
     println!("Testing synchronous exception handling by causing a page fault");
     println!("-------------------------------------------------------------------\n");
 
     exception::handling_init();
+
+    use memory::mmu::interface::MMU;
 
     if let Err(string) = memory::mmu::mmu().init() {
         println!("MMU: {}", string);

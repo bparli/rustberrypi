@@ -1,17 +1,7 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! PL011 UART driver.
-
 use crate::{bsp, console, cpu, driver, exception};
 use core::{fmt, ops};
 use register::{mmio::*, register_bitfields, register_structs};
 use spin;
-
-//--------------------------------------------------------------------------------------------------
-// Private Definitions
-//--------------------------------------------------------------------------------------------------
 
 // PL011 UART registers.
 //
@@ -137,7 +127,6 @@ register_bitfields! {
         ]
     ],
 
-    /// Raw Interrupt Status Register
     RIS [
         // Receive timeout interrupt status. Returns the raw interrupt state of the UARTRTINTR
         // interrupt.
@@ -159,10 +148,6 @@ enum BlockingMode {
     Blocking,
     NonBlocking,
 }
-
-//--------------------------------------------------------------------------------------------------
-// Public Definitions
-//--------------------------------------------------------------------------------------------------
 
 register_structs! {
     #[allow(non_snake_case)]
@@ -419,7 +404,7 @@ impl console::interface::Statistics for PL011Uart {
 impl exception::asynchronous::interface::IRQHandler for PL011Uart {
     fn handle(&self) -> Result<(), &'static str> {
         let mut data = self.inner.lock();
-        
+        // Echo any received characters.
         let pending = data.RIS.extract();
 
         // Clear all pending IRQs.

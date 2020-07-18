@@ -1,25 +1,11 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! Interrupt Controller Driver.
-
 mod peripheral_ic;
 
 use crate::{driver, exception};
-
-//--------------------------------------------------------------------------------------------------
-// Private Definitions
-//--------------------------------------------------------------------------------------------------
 
 /// Wrapper struct for a bitmask indicating pending IRQ numbers.
 struct PendingIRQs {
     bitmask: u64,
 }
-
-//--------------------------------------------------------------------------------------------------
-// Public Definitions
-//--------------------------------------------------------------------------------------------------
 
 pub type LocalIRQ =
     exception::asynchronous::IRQNumber<{ InterruptController::MAX_LOCAL_IRQ_NUMBER }>;
@@ -37,10 +23,6 @@ pub enum IRQNumber {
 pub struct InterruptController {
     periph: peripheral_ic::PeripheralIC,
 }
-
-//--------------------------------------------------------------------------------------------------
-// Private Code
-//--------------------------------------------------------------------------------------------------
 
 impl PendingIRQs {
     pub fn new(bitmask: u64) -> Self {
@@ -64,10 +46,6 @@ impl Iterator for PendingIRQs {
         Some(next as usize)
     }
 }
-
-//--------------------------------------------------------------------------------------------------
-// Public Code
-//--------------------------------------------------------------------------------------------------
 
 impl InterruptController {
     const MAX_LOCAL_IRQ_NUMBER: usize = 11;

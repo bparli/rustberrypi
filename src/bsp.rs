@@ -8,13 +8,13 @@ pub use raspberrypi::*;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::memory;
     use test_macros::kernel_test;
 
     /// Ensure the kernel's virtual memory layout is free of overlaps.
     #[kernel_test]
     fn virt_mem_layout_has_no_overlaps() {
-        let layout = memory::mmu::virt_mem_layout().inner();
+        let layout = memory::virt_mem_layout().inner();
 
         for (i, first) in layout.iter().enumerate() {
             for second in layout.iter().skip(i + 1) {

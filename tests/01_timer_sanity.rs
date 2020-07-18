@@ -13,13 +13,21 @@
 mod panic_exit_failure;
 
 use core::time::Duration;
-use libkernel::{bsp, cpu, time, time::interface::TimeManager};
+use libkernel::{bsp, cpu, memory, time, time::interface::TimeManager};
+use linked_list_allocator::LockedHeap;
 use test_macros::kernel_test;
+extern crate alloc;
+
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
-    bsp::console::qemu_bring_up_console();
+    ALLOCATOR
+        .lock()
+        .init(memory::map::HEAP_START, memory::heap_size());
 
+    bsp::qemu_bring_up_console();
     // Depending on CPU arch, some timer bring-up code could go here. Not needed for the RPi.
 
     test_main();

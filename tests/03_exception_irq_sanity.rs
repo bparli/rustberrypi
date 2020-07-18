@@ -12,12 +12,20 @@
 
 mod panic_exit_failure;
 
-use libkernel::{bsp, cpu, exception};
+use libkernel::{bsp, cpu, exception, memory};
+use linked_list_allocator::LockedHeap;
 use test_macros::kernel_test;
+extern crate alloc;
+
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
-    bsp::console::qemu_bring_up_console();
+    ALLOCATOR
+        .lock()
+        .init(memory::map::HEAP_START, memory::heap_size());
+    bsp::qemu_bring_up_console();
 
     exception::handling_init();
     exception::asynchronous::local_irq_unmask();

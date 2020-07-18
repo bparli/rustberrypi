@@ -1,17 +1,6 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! GPIO Driver.
-//!
-
 use crate::{bsp::device_driver::common::MMIODerefWrapper, cpu, driver};
 use register::{mmio::*, register_bitfields, register_structs};
 use spin;
-
-//--------------------------------------------------------------------------------------------------
-// Private Definitions
-//--------------------------------------------------------------------------------------------------
 
 // GPIO registers.
 //
@@ -74,18 +63,10 @@ register_structs! {
 /// Abstraction for the associated MMIO registers.
 type Regs = MMIODerefWrapper<RegisterBlock>;
 
-//--------------------------------------------------------------------------------------------------
-// Public Definitions
-//--------------------------------------------------------------------------------------------------
-
 /// Representation of the GPIO HW.
 pub struct GPIO {
     inner: spin::Mutex<Regs>,
 }
-
-//--------------------------------------------------------------------------------------------------
-// Public Code
-//--------------------------------------------------------------------------------------------------
 
 impl GPIO {
     /// Create an instance.

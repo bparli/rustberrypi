@@ -10,15 +10,23 @@
 
 mod panic_exit_failure;
 
-use libkernel::{bsp, console, print};
+use libkernel::{bsp, console, memory, print};
+use linked_list_allocator::LockedHeap;
+extern crate alloc;
+
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
-    use bsp::console::{console, qemu_bring_up_console};
-    use console::interface::*;
+    use bsp::{console, qemu_bring_up_console};
+    use console::interface::{Read, Statistics};
+
+    ALLOCATOR
+        .lock()
+        .init(memory::map::HEAP_START, memory::heap_size());
 
     qemu_bring_up_console();
-
     // Handshake
     assert_eq!(console().read_char(), 'A');
     assert_eq!(console().read_char(), 'B');

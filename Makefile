@@ -83,7 +83,6 @@ $(KERNEL_ELF):
 $(KERNEL_BIN): $(KERNEL_ELF)
 	@$(OBJCOPY_CMD) $(KERNEL_ELF) $(KERNEL_BIN)
 
-qemu: FEATURES += --features qemu-quirks
 ifeq ($(QEMU_MACHINE_TYPE),)
 qemu test:
 	@echo $(QEMU_MISSING_STRING)
@@ -100,12 +99,11 @@ define KERNEL_TEST_RUNNER
 endef
 
 export KERNEL_TEST_RUNNER
-#test: FEATURES += --features qemu-quirks
 test:
 	@mkdir -p target
 	@echo "$$KERNEL_TEST_RUNNER" > target/kernel_test_runner.sh
 	@chmod +x target/kernel_test_runner.sh
-	RUSTFLAGS="$(RUSTFLAGS_PEDANTIC)" $(TEST_CMD) --features qemu-quirks $(TEST_ARG)
+	RUSTFLAGS="$(RUSTFLAGS_PEDANTIC)" $(TEST_CMD) $(TEST_ARG)
 endif
 
 chainboot: $(KERNEL_BIN)

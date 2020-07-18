@@ -140,12 +140,6 @@ mod tests {
             assert!(end >= start);
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use test_macros::kernel_test;
 
     /// Check `zero_volatile()`.
     #[kernel_test]
