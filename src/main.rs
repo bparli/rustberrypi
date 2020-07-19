@@ -25,11 +25,11 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
     use driver::interface::DriverManager;
-    use memory::mmu::interface::MMU;
+    //use memory::mmu::interface::MMU;
 
     exception::handling_init();
 
-    if let Err(string) = memory::mmu::mmu().init() {
+    if let Err(string) = memory::mmu::init() {
         panic!("MMU: {}", string);
     }
 
@@ -56,7 +56,7 @@ unsafe fn kernel_init() -> ! {
 
     ALLOCATOR
         .lock()
-        .init(memory::map::HEAP_START, memory::heap_size());
+        .init(memory::map::virt::HEAP_START, memory::heap_size());
 
     // Transition from unsafe to safe.
     kernel_main()
@@ -70,7 +70,7 @@ fn kernel_main() -> ! {
     info!("Booting on: {}", bsp::board_name());
 
     info!("MMU online. Special regions:");
-    memory::virt_mem_layout().print_layout();
+    memory::print_layout();
 
     let (_, privilege_level) = exception::current_privilege_level();
     info!("Current privilege level: {}", privilege_level);

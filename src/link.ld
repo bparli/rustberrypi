@@ -18,7 +18,7 @@ SECTIONS
     {
         *(.rodata*)
     }
-    . = ALIGN(65536); /* Fill up to 64 KiB */
+    . = ALIGN(4096); /* Fill up to 64 KiB */
     __ro_end = .;
 
     .data :
