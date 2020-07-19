@@ -13,7 +13,7 @@
 mod panic_exit_failure;
 
 use core::time::Duration;
-use libkernel::{bsp, cpu, memory, time, time::interface::TimeManager};
+use libkernel::{bsp, cpu, memory, time};
 use linked_list_allocator::LockedHeap;
 use test_macros::kernel_test;
 extern crate alloc;
