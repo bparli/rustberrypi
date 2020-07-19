@@ -25,7 +25,7 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 unsafe fn kernel_init() -> ! {
     ALLOCATOR
         .lock()
-        .init(memory::map::HEAP_START, memory::heap_size());
+        .init(memory::map::virt::HEAP_START, memory::heap_size());
 
     bsp::qemu_bring_up_console();
     // Depending on CPU arch, some timer bring-up code could go here. Not needed for the RPi.

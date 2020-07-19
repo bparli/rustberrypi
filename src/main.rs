@@ -25,7 +25,6 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
     use driver::interface::DriverManager;
-    //use memory::mmu::interface::MMU;
 
     exception::handling_init();
 

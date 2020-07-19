@@ -50,8 +50,8 @@ pub mod map {
         pub const KERN_STACK_END:      usize =             0x0007_FFFF;
 
         // The second 2 MiB block.
-        pub const HEAP_START:      usize =             0x0020_0000;
-        pub const HEAP_END:        usize =             0x005F_FFFF;
+        pub const HEAP_START:          usize =             0x0020_0000;
+        pub const HEAP_END:            usize =             0x005F_FFFF;
     }
 }
 
@@ -291,5 +291,44 @@ pub fn print_layout() {
 
     for i in KERNEL_VIRTUAL_LAYOUT.iter() {
         info!("{}", i);
+    }
+}
+
+/// Return a reference to the virtual memory layout.
+pub fn virt_mem_layout() -> &'static [Descriptor; 5] {
+    &KERNEL_VIRTUAL_LAYOUT
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_macros::kernel_test;
+
+    /// Check 4 KiB alignment of the kernel's virtual memory layout sections.
+    #[kernel_test]
+    fn virt_mem_layout_sections_are_4KiB_aligned() {
+        const FOUR_KIB: usize = 4096;
+
+        for i in KERNEL_VIRTUAL_LAYOUT.iter() {
+            if i.name != "Kernel data and BSS" {
+                let start: usize = *(i.virtual_range)().start();
+                let end: usize = *(i.virtual_range)().end() + 1;
+
+                assert_eq!(start % FOUR_KIB, 0);
+                assert_eq!(end % FOUR_KIB, 0);
+                assert!(end >= start);
+            }
+        }
+    }
+
+    /// Check `zero_volatile()`.
+    #[kernel_test]
+    fn zero_volatile_works() {
+        let mut x: [usize; 3] = [10, 11, 12];
+        let x_range = x.as_mut_ptr_range();
+
+        unsafe { zero_volatile(x_range) };
+
+        assert_eq!(x, [0, 0, 0]);
     }
 }

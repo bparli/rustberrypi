@@ -26,10 +26,6 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
-    ALLOCATOR
-        .lock()
-        .init(memory::map::HEAP_START, memory::heap_size());
-
     bsp::qemu_bring_up_console();
 
     println!("Testing synchronous exception handling by causing a page fault");
@@ -37,12 +33,16 @@ unsafe fn kernel_init() -> ! {
 
     exception::handling_init();
 
-    use memory::mmu::interface::MMU;
+    //use memory::mmu::interface::MMU;
 
-    if let Err(string) = memory::mmu::mmu().init() {
+    if let Err(string) = memory::mmu::init() {
         println!("MMU: {}", string);
         cpu::qemu_exit_failure()
     }
+
+    ALLOCATOR
+        .lock()
+        .init(memory::map::virt::HEAP_START, memory::heap_size());
 
     println!("Writing beyond mapped area to address 9 GiB...");
     let big_addr: u64 = 9 * 1024 * 1024 * 1024;

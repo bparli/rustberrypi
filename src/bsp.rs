@@ -14,7 +14,7 @@ mod tests {
     /// Ensure the kernel's virtual memory layout is free of overlaps.
     #[kernel_test]
     fn virt_mem_layout_has_no_overlaps() {
-        let layout = memory::virt_mem_layout().inner();
+        let layout = memory::virt_mem_layout();
 
         for (i, first) in layout.iter().enumerate() {
             for second in layout.iter().skip(i + 1) {
