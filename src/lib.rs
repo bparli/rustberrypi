@@ -13,6 +13,7 @@
 #![feature(trait_alias)]
 #![no_std]
 #![feature(ptr_internals)]
+#![feature(llvm_asm)]
 // Testing
 #![cfg_attr(test, no_main)]
 #![feature(custom_test_frameworks)]

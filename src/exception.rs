@@ -13,7 +13,6 @@ pub enum PrivilegeLevel {
 use crate::{bsp, exception};
 use core::fmt;
 use cortex_a::{barrier, regs::*};
-//use register::InMemoryRegister;
 
 // Assembly counterpart to this file.
 global_asm!(include_str!("exception.S"));

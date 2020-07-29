@@ -1,5 +1,4 @@
 use crate::exception::ExceptionContext;
-//use crate::info;
 use crate::memory::ALLOCATOR;
 use alloc::alloc::Layout;
 use alloc::boxed::Box;
@@ -155,49 +154,3 @@ macro_rules! impl_for {
 }
 
 impl_for!(PhysicalAddr);
-
-// pub fn copy_process(entry: fn(arg: &str), arg: &str) -> i8 {
-//     unsafe {
-//         let layout = Layout::from_size_align_unchecked(4096, 16);
-//         let task = alloc_zeroed(layout);
-
-//         *(task as *mut Task) = init_task();
-
-//         preempt_disable();
-
-//         NUM_TASKS += 1;
-//         let mut t = *(task as *mut Task);
-//         t.priority = CURRENT.priority;
-//         t.state = TaskState::RUNNING;
-//         t.counter = t.priority;
-//         t.ptr = task;
-//         t.preempt_count = 1;
-
-//         t.context.x19 = entry as *mut u8;
-//         t.context.x20 = arg.as_ptr() as *mut u8;
-//         t.context.pc = return_from_fork as *mut u8;
-//         t.context.sp = t.ptr.offset(4096);
-//         t.pid = NUM_TASKS - 1;
-//         TASKS[NUM_TASKS - 1] = t;
-//         preempt_enable();
-
-//         info!(
-//             "forked proc {:?}, {:?}, {:?}, {:?}",
-//             t.pid, t.context.sp, t.ptr, task
-//         );
-//         return 0;
-//     }
-// }
-
-// fn return_from_fork() {
-//     info!("TEST ret from fork");
-//     unsafe {
-//         preempt_enable();
-//         info!("TEST ret from fork preempt enabled");
-//         asm! {"
-//             mov    x0, x20
-//             blr    x19
-//         "};
-//     }
-//     info!("TEST ret from fork DONE");
-// }

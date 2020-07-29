@@ -1,6 +1,7 @@
 use crate::{exception, process};
 extern crate alloc;
 use alloc::collections::vec_deque::VecDeque;
+use cortex_a::regs::*;
 use process::{Task, TaskState};
 use spin::Mutex;
 
@@ -116,6 +117,7 @@ impl Scheduler {
                 task.counter = 1;
                 task.state = TaskState::READY;
                 *task.context = *ec;
+                self.flush_tlb(&task.stack);
                 self.processes.push_back(task);
             } else {
                 return None;
@@ -138,6 +140,21 @@ impl Scheduler {
                 }
             }
             unsafe { asm!("wfi") }
+        }
+    }
+
+    fn flush_tlb(&self, st: &process::Stack) {
+        unsafe {
+            if st.bottom().as_u64() != TTBR1_EL1.get() {
+                llvm_asm! {"
+                    msr	ttbr1_el1, $0
+                    tlbi vmalle1is
+                    DSB ISH
+                    isb
+                "
+                ::   "r"(st.bottom().as_u64())
+                }
+            }
         }
     }
 }
