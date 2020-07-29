@@ -137,6 +137,7 @@ impl Scheduler {
                     self.processes.push_back(new_task);
                 }
             }
+            unsafe { asm!("wfi") }
         }
     }
 }
