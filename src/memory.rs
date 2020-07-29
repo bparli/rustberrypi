@@ -1,8 +1,13 @@
 use core::fmt;
 use core::ops::Range;
 use core::ops::RangeInclusive;
+use kernel_mem_range::*;
+use linked_list_allocator::LockedHeap;
 
 pub mod mmu;
+
+#[global_allocator]
+pub static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 /// Zero out a memory region.
 ///
@@ -104,8 +109,6 @@ pub mod kernel_mem_range {
         pub attribute_fields: AttributeFields,
     }
 }
-
-use kernel_mem_range::*;
 
 /// A virtual memory layout that is agnostic of the paging granularity that the
 /// hardware MMU will use.

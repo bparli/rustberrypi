@@ -1,7 +1,3 @@
-// #[path = "arch/exception.rs"]
-// mod arch_exception;
-// pub use arch_exception::*;
-
 pub mod asynchronous;
 
 /// Kernel privilege levels.
@@ -17,29 +13,29 @@ pub enum PrivilegeLevel {
 use crate::{bsp, exception};
 use core::fmt;
 use cortex_a::{barrier, regs::*};
-use register::InMemoryRegister;
+//use register::InMemoryRegister;
 
 // Assembly counterpart to this file.
 global_asm!(include_str!("exception.S"));
 
-/// Wrapper struct for memory copy of SPSR_EL1.
-#[repr(transparent)]
-struct SpsrEL1(InMemoryRegister<u32, SPSR_EL1::Register>);
-
 /// The exception context as it is stored on the stack on exception entry.
+#[derive(Default, Copy, Clone)]
 #[repr(C)]
-struct ExceptionContext {
+pub struct ExceptionContext {
     /// General Purpose Registers.
-    gpr: [u64; 30],
+    pub gpr: [u64; 30],
+
+    pub tpidr: u64,
+    pub sp: u64,
 
     /// The link register, aka x30.
-    lr: u64,
+    pub lr: u64,
 
     /// Exception link register. The program counter at the time the exception happened.
-    elr_el1: u64,
+    pub elr: u64,
 
     /// Saved program status.
-    spsr_el1: SpsrEL1,
+    pub spsr: u64,
 }
 
 /// Wrapper struct for pretty printing ESR_EL1.
@@ -87,11 +83,11 @@ unsafe extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 }
 
 #[no_mangle]
-unsafe extern "C" fn current_elx_irq(_e: &mut ExceptionContext) {
+unsafe extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
     use exception::asynchronous::interface::IRQManager;
 
     let token = &exception::asynchronous::IRQContext::new();
-    bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token);
+    bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
 }
 
 #[no_mangle]
@@ -167,46 +163,11 @@ impl fmt::Display for EsrEL1 {
     }
 }
 
-/// Human readable SPSR_EL1.
-#[rustfmt::skip]
-impl fmt::Display for SpsrEL1 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Raw value.
-        writeln!(f, "SPSR_EL1: {:#010x}", self.0.get())?;
-
-        let to_flag_str = |x| -> _ {
-            if x { "Set" } else { "Not set" }
-         };
-
-        writeln!(f, "      Flags:")?;
-        writeln!(f, "            Negative (N): {}", to_flag_str(self.0.is_set(SPSR_EL1::N)))?;
-        writeln!(f, "            Zero     (Z): {}", to_flag_str(self.0.is_set(SPSR_EL1::Z)))?;
-        writeln!(f, "            Carry    (C): {}", to_flag_str(self.0.is_set(SPSR_EL1::C)))?;
-        writeln!(f, "            Overflow (V): {}", to_flag_str(self.0.is_set(SPSR_EL1::V)))?;
-
-        let to_mask_str = |x| -> _ {
-            if x { "Masked" } else { "Unmasked" }
-        };
-
-        writeln!(f, "      Exception handling state:")?;
-        writeln!(f, "            Debug  (D): {}", to_mask_str(self.0.is_set(SPSR_EL1::D)))?;
-        writeln!(f, "            SError (A): {}", to_mask_str(self.0.is_set(SPSR_EL1::A)))?;
-        writeln!(f, "            IRQ    (I): {}", to_mask_str(self.0.is_set(SPSR_EL1::I)))?;
-        writeln!(f, "            FIQ    (F): {}", to_mask_str(self.0.is_set(SPSR_EL1::F)))?;
-
-        write!(f, "      Illegal Execution State (IL): {}",
-            to_flag_str(self.0.is_set(SPSR_EL1::IL))
-        )?;
-
-        Ok(())
-    }
-}
-
 /// Human readable print of the exception context.
 impl fmt::Display for ExceptionContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "ELR_EL1: {:#018x}", self.elr_el1)?;
-        writeln!(f, "{}", self.spsr_el1)?;
+        writeln!(f, "ELR: {:#018x}", self.elr)?;
+        writeln!(f, "{}", self.spsr)?;
         writeln!(f)?;
         writeln!(f, "General purpose register:")?;
 

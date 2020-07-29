@@ -5,12 +5,11 @@
 #![no_std]
 
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-use libkernel::{bsp, cpu, driver, exception, info, memory, state, time, warn};
-use linked_list_allocator::LockedHeap;
+use libkernel::{bsp, driver, exception, info, memory, process, sched, state, time, warn};
 extern crate alloc;
-
-#[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+use core::time::Duration;
+use memory::ALLOCATOR;
+use sched::SCHEDULER;
 
 /// Early init code.
 ///
@@ -56,6 +55,7 @@ unsafe fn kernel_init() -> ! {
     ALLOCATOR
         .lock()
         .init(memory::map::virt::HEAP_START, memory::heap_size());
+    SCHEDULER.init();
 
     // Transition from unsafe to safe.
     kernel_main()
@@ -118,6 +118,31 @@ fn kernel_main() -> ! {
         Rc::strong_count(&cloned_reference)
     );
 
-    info!("Echoing input now");
-    cpu::wait_forever();
+    let mut task = process::Task::new().unwrap();
+    task.context.sp = task.stack.top().as_u64();
+    task.context.elr = process1 as *mut u8 as u64;
+    task.context.spsr = 0b0101; // To EL 1 for now
+    SCHEDULER.add_task(task).unwrap();
+
+    let mut task2 = process::Task::new().unwrap();
+    task2.context.sp = task2.stack.top().as_u64();
+    task2.context.elr = process2 as *mut u8 as u64;
+    task2.context.spsr = 0b0101; // To EL 1 for now
+    SCHEDULER.add_task(task2).unwrap();
+
+    loop {}
+}
+
+fn process1() {
+    loop {
+        info!("forked proc numero uno");
+        time::time_manager().spin_for(Duration::from_secs(3));
+    }
+}
+
+fn process2() {
+    loop {
+        info!("forked proc dos");
+        time::time_manager().spin_for(Duration::from_secs(2));
+    }
 }

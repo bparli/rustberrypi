@@ -402,7 +402,7 @@ impl console::interface::Statistics for PL011Uart {
 }
 
 impl exception::asynchronous::interface::IRQHandler for PL011Uart {
-    fn handle(&self) -> Result<(), &'static str> {
+    fn handle(&self, _e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
         let mut data = self.inner.lock();
         // Echo any received characters.
         let pending = data.RIS.extract();

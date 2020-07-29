@@ -1,3 +1,4 @@
+use crate::exception::ExceptionContext;
 use core::{fmt, marker::PhantomData};
 use cortex_a::regs::*;
 
@@ -7,7 +8,7 @@ pub mod interface {
     /// Implemented by types that handle IRQs.
     pub trait IRQHandler {
         /// Called when the corresponding interrupt is asserted.
-        fn handle(&self) -> Result<(), &'static str>;
+        fn handle(&self, _e: &mut super::ExceptionContext) -> Result<(), &'static str>;
     }
 
     /// IRQ management functions.
@@ -39,6 +40,7 @@ pub mod interface {
         fn handle_pending_irqs<'irq_context>(
             &'irq_context self,
             ic: &super::IRQContext<'irq_context>,
+            _e: &mut super::ExceptionContext,
         );
 
         /// Print list of registered handlers.

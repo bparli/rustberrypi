@@ -1,4 +1,4 @@
-use crate::{bsp, driver, exception};
+use crate::{bsp, driver, exception, sched};
 use core::ops;
 use register::{mmio::*, register_bitfields, register_structs};
 use spin;
@@ -65,7 +65,7 @@ impl SystemTimerInner {
         Self {
             base_addr,
             interval: 200000,
-            cur_val: 0
+            cur_val: 0,
         }
     }
 
@@ -93,8 +93,6 @@ impl SystemTimer {
             irq_number: irq_number,
         }
     }
-
-    
 }
 
 impl driver::interface::DeviceDriver for SystemTimer {
@@ -126,12 +124,13 @@ impl driver::interface::DeviceDriver for SystemTimer {
 }
 
 impl exception::asynchronous::interface::IRQHandler for SystemTimer {
-    fn handle(&self) -> Result<(), &'static str> {
-        use crate::info;
+    fn handle(&self, e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
+        use sched::SCHEDULER;
 
         let mut data = self.inner.lock();
         data.handle();
-        info!("Timer interrupt received\n\r");
+        SCHEDULER.timer_tick(e);
+
         Ok(())
     }
 }

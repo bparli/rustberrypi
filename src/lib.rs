@@ -12,6 +12,7 @@
 #![feature(slice_ptr_range)]
 #![feature(trait_alias)]
 #![no_std]
+#![feature(ptr_internals)]
 // Testing
 #![cfg_attr(test, no_main)]
 #![feature(custom_test_frameworks)]
@@ -32,6 +33,8 @@ pub mod driver;
 pub mod exception;
 pub mod memory;
 pub mod print;
+pub mod process;
+pub mod sched;
 pub mod state;
 pub mod time;
 

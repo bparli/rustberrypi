@@ -114,6 +114,7 @@ impl exception::asynchronous::interface::IRQManager for PeripheralIC {
     fn handle_pending_irqs<'irq_context>(
         &'irq_context self,
         _ic: &exception::asynchronous::IRQContext<'irq_context>,
+        e: &mut exception::ExceptionContext,
     ) {
         let table = &self.handler_table.read();
         for irq_number in self.get_pending() {
@@ -121,7 +122,7 @@ impl exception::asynchronous::interface::IRQManager for PeripheralIC {
                 None => panic!("No handler registered for IRQ {}", irq_number),
                 Some(descriptor) => {
                     // Call the IRQ handler. Panics on failure.
-                    descriptor.handler.handle().expect("Error handling IRQ");
+                    descriptor.handler.handle(e).expect("Error handling IRQ");
                 }
             }
         }

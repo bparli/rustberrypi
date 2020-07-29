@@ -98,9 +98,10 @@ impl exception::asynchronous::interface::IRQManager for InterruptController {
     fn handle_pending_irqs<'irq_context>(
         &'irq_context self,
         ic: &exception::asynchronous::IRQContext<'irq_context>,
+        e: &mut exception::ExceptionContext,
     ) {
         // It can only be a peripheral IRQ pending because enable() does not support local IRQs yet.
-        self.periph.handle_pending_irqs(ic)
+        self.periph.handle_pending_irqs(ic, e)
     }
 
     fn print_handler(&self) {
