@@ -119,13 +119,13 @@ fn kernel_main() -> ! {
     );
 
     let mut task = process::Task::new().unwrap();
-    task.context.sp = task.stack.top().as_u64();
+    task.context.sp = task.stack.bottom().as_u64();
     task.context.elr = process1 as *mut u8 as u64;
     task.context.spsr = 0b0101; // To EL 1 for now
     SCHEDULER.add_task(task).unwrap();
 
     let mut task2 = process::Task::new().unwrap();
-    task2.context.sp = task2.stack.top().as_u64();
+    task2.context.sp = task2.stack.bottom().as_u64();
     task2.context.elr = process2 as *mut u8 as u64;
     task2.context.spsr = 0b0101; // To EL 1 for now
     SCHEDULER.add_task(task2).unwrap();
@@ -136,7 +136,7 @@ fn kernel_main() -> ! {
 fn process1() {
     loop {
         info!("forked proc numero uno");
-        time::time_manager().spin_for(Duration::from_secs(3));
+        time::time_manager().spin_for(Duration::from_secs(2));
     }
 }
 

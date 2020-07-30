@@ -93,34 +93,19 @@ impl Scheduler {
     /// This method blocks until there is a process to switch to, conserving
     /// energy as much as possible in the interim.
     fn switch(&mut self, ec: &mut exception::ExceptionContext) -> Option<u64> {
-        if self.processes.len() < 2 {
-            return None;
-        }
-
-        // must be the real init proc
-        if self.current != Some(ec.tpidr) {
-            let mut t = process::Task::new().unwrap();
-            t.pid = 1;
-            t.state = TaskState::RUNNING;
-            *t.context = *ec;
-            t.context.sp = t.stack.top().as_u64();
-            t.context.tpidr = 1;
-            self.current = Some(ec.tpidr);
-            self.processes.push_front(t);
-            return None;
-        }
-
-        if let Some(task) = self.processes.front_mut() {
-            task.counter -= 1;
-            if task.counter <= 0 {
-                let mut task = self.processes.pop_front().unwrap();
-                task.counter = 1;
-                task.state = TaskState::READY;
-                *task.context = *ec;
-                self.flush_tlb(&task.stack);
-                self.processes.push_back(task);
-            } else {
-                return None;
+        if self.current == Some(ec.tpidr) {
+            if let Some(running) = self.processes.front_mut() {
+                running.counter -= 1;
+                if running.counter <= 0 {
+                    let mut running = self.processes.pop_front().unwrap();
+                    running.counter = 1;
+                    running.state = TaskState::READY;
+                    *running.context = *ec;
+                    flush_tlb(&running.stack);
+                    self.processes.push_back(running);
+                } else {
+                    return None;
+                }
             }
         }
 
@@ -142,18 +127,18 @@ impl Scheduler {
             unsafe { asm!("wfi") }
         }
     }
+}
 
-    fn flush_tlb(&self, st: &process::Stack) {
-        unsafe {
-            if st.bottom().as_u64() != TTBR1_EL1.get() {
-                llvm_asm! {"
-                    msr	ttbr1_el1, $0
-                    tlbi vmalle1is
-                    DSB ISH
-                    isb
-                "
-                ::   "r"(st.bottom().as_u64())
-                }
+fn flush_tlb(st: &process::Stack) {
+    unsafe {
+        if st.bottom().as_u64() != TTBR1_EL1.get() {
+            llvm_asm! {"
+                msr	ttbr1_el1, $0
+                tlbi vmalle1is
+                DSB ISH
+                isb
+            "
+            ::   "r"(st.bottom().as_u64())
             }
         }
     }
