@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
-
-//! BCM driver top level.
-
 mod gpio;
 mod interrupt_controller;
 mod pl011_uart;
