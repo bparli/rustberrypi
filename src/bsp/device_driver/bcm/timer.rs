@@ -129,8 +129,8 @@ impl exception::asynchronous::interface::IRQHandler for SystemTimer {
 
         let mut data = self.inner.lock();
         data.handle();
-        SCHEDULER.timer_tick(e);
 
+        SCHEDULER.timer_tick(e);
         Ok(())
     }
 }

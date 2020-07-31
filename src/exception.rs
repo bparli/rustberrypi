@@ -24,14 +24,13 @@ pub struct ExceptionContext {
     /// General Purpose Registers.
     pub gpr: [u64; 30],
 
-    pub tpidr: u64,
-    pub sp: u64,
-
     /// The link register, aka x30.
     pub lr: u64,
 
     /// Exception link register. The program counter at the time the exception happened.
     pub elr: u64,
+    pub sp: u64,
+    pub tpidr: u64,
 
     /// Saved program status.
     pub spsr: u64,
@@ -59,12 +58,18 @@ fn default_exception_handler(e: &ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_synchronous(e: &mut ExceptionContext) {
+    use crate::info;
+    info!("Exception current_el0_synchronousfor proc {:?}", e.tpidr);
     default_exception_handler(e);
 }
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_irq(e: &mut ExceptionContext) {
-    default_exception_handler(e);
+    use crate::info;
+    info!("Exception current_el0_irq for proc {:?}", e.tpidr);
+    use exception::asynchronous::interface::IRQManager;
+    let token = &exception::asynchronous::IRQContext::new();
+    bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
 }
 
 #[no_mangle]
@@ -83,7 +88,9 @@ unsafe extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
+    use crate::info;
     use exception::asynchronous::interface::IRQManager;
+    info!("Exception current_elx_irq for proc {:?}", e.tpidr);
 
     let token = &exception::asynchronous::IRQContext::new();
     bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);

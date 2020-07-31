@@ -25,17 +25,16 @@
     stp    x26, x27, [sp, #16 * 13]
     stp    x28, x29, [sp, #16 * 14]
 
-    mrs     x2, TPIDR_EL0
-    mrs     x1, SP_EL0
-    stp     x1, x2, [SP, #16 * 15]
-
     // Add the exception link register (ELR_EL1) and the saved program status (SPSR_EL1).
     mrs    x1,  ELR_EL1
-    mrs    x2,  SPSR_EL1
-
-    stp    lr,  x1,  [sp, #16 * 16]
+    stp    lr,  x1,  [sp, #16 * 15]
     
-    str    w2,       [sp, #16 * 17]
+    mrs     x2, TPIDR_EL0
+    mrs     x1, SP_EL0
+    stp     x1, x2, [SP, #16 * 16]
+
+    mrs    x1,  SPSR_EL1
+    str    w1,      [sp, #16 * 17]
 
     // x0 is the first argument for the function called through `\handler`.
     mov    x0,  sp
@@ -116,16 +115,15 @@ __exception_vector_start:
 .section .text
 
 __exception_restore_context:
-    ldr    w19,      [sp, #16 * 17]
-    ldp    x1, x2,   [sp, #16 * 15]
-    msr    TPIDR_EL0, x2
-    msr    SP_EL0,    x1
-    
-    ldp    lr, x20,   [sp, #16 * 16]
+    ldr    w1,      [sp, #16 * 17]
+    ldp    lr,  x2, [sp, #16 * 15]
 
+    msr    SPSR_EL1, x1
+    msr    ELR_EL1,  x2
 
-    msr    SPSR_EL1, x19
-    msr    ELR_EL1,  x20
+    ldp     x1, x2, [SP, #16 * 16]
+    msr     TPIDR_EL0, x2
+    msr     SP_EL0, x1   
 
     ldp    x0,  x1,  [sp, #16 * 0]
     ldp    x2,  x3,  [sp, #16 * 1]

@@ -1,5 +1,6 @@
 use crate::exception::ExceptionContext;
 use crate::memory::ALLOCATOR;
+use crate::sched::SCHEDULER;
 use alloc::alloc::Layout;
 use alloc::boxed::Box;
 use core::fmt;
@@ -154,3 +155,19 @@ macro_rules! impl_for {
 }
 
 impl_for!(PhysicalAddr);
+
+pub fn add_user_process(entry: fn()) {
+    add_process(entry, 0b0100); // EL0
+}
+
+pub fn add_kernel_process(entry: fn()) {
+    add_process(entry, 0b0101); // EL1
+}
+
+fn add_process(entry: fn(), spsr: u64) {
+    let mut task = Task::new().unwrap();
+    task.context.sp = task.stack.bottom().as_u64();
+    task.context.elr = entry as *mut u8 as u64;
+    task.context.spsr = spsr;
+    SCHEDULER.add_task(task).unwrap();
+}

@@ -32,7 +32,7 @@ impl GlobalScheduler {
     /// process to `new_state`, saving `tf` into the current process, and
     /// restoring the next process's trap frame into `tf`. For more details, see
     /// the documentation on `Scheduler::switch()`.
-    pub fn switch(&self, ec: &mut exception::ExceptionContext) -> Option<u64> {
+    pub fn switch(&self, ec: &mut exception::ExceptionContext) {
         self.0
             .lock()
             .as_mut()
@@ -40,7 +40,7 @@ impl GlobalScheduler {
             .switch(ec)
     }
 
-    pub fn timer_tick(&self, e: &mut exception::ExceptionContext) -> Option<u64> {
+    pub fn timer_tick(&self, e: &mut exception::ExceptionContext) {
         exception::asynchronous::exec_with_irq_masked(|| self.switch(e))
     }
 }
@@ -92,7 +92,7 @@ impl Scheduler {
     ///
     /// This method blocks until there is a process to switch to, conserving
     /// energy as much as possible in the interim.
-    fn switch(&mut self, ec: &mut exception::ExceptionContext) -> Option<u64> {
+    fn switch(&mut self, ec: &mut exception::ExceptionContext) {
         if self.current == Some(ec.tpidr) {
             if let Some(running) = self.processes.front_mut() {
                 running.counter -= 1;
@@ -104,7 +104,7 @@ impl Scheduler {
                     flush_tlb(&running.stack);
                     self.processes.push_back(running);
                 } else {
-                    return None;
+                    return;
                 }
             }
         }
@@ -118,7 +118,7 @@ impl Scheduler {
                     new_task.state = TaskState::RUNNING;
                     self.current = Some(ec.tpidr);
                     self.processes.push_front(new_task);
-                    return self.current;
+                    return;
                 } else {
                     new_task.counter = (new_task.counter >> 1) + new_task.priority;
                     self.processes.push_back(new_task);

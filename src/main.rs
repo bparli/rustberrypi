@@ -118,18 +118,9 @@ fn kernel_main() -> ! {
         Rc::strong_count(&cloned_reference)
     );
 
-    let mut task = process::Task::new().unwrap();
-    task.context.sp = task.stack.bottom().as_u64();
-    task.context.elr = process1 as *mut u8 as u64;
-    task.context.spsr = 0b0101; // To EL 1 for now
-    SCHEDULER.add_task(task).unwrap();
-
-    let mut task2 = process::Task::new().unwrap();
-    task2.context.sp = task2.stack.bottom().as_u64();
-    task2.context.elr = process2 as *mut u8 as u64;
-    task2.context.spsr = 0b0101; // To EL 1 for now
-    SCHEDULER.add_task(task2).unwrap();
-
+    process::add_user_process(process1);
+    process::add_user_process(process2);
+    process::add_kernel_process(process3);
     loop {}
 }
 
@@ -143,6 +134,13 @@ fn process1() {
 fn process2() {
     loop {
         info!("forked proc dos");
+        time::time_manager().spin_for(Duration::from_secs(2));
+    }
+}
+
+fn process3() {
+    loop {
+        info!("forked proc tres");
         time::time_manager().spin_for(Duration::from_secs(2));
     }
 }
