@@ -4,6 +4,7 @@ use crate::sched::SCHEDULER;
 use alloc::alloc::Layout;
 use alloc::boxed::Box;
 use core::fmt;
+use core::mem::replace;
 use core::ptr::{NonNull, Unique};
 
 #[repr(C)]
@@ -16,11 +17,19 @@ pub struct Task {
     pub stack: Stack,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+/// Type of a function used to determine if a task is ready to be scheduled
+/// again. The scheduler calls this function when it is the task's turn to
+/// execute. If the function returns `true`, the task is scheduled. If it
+/// returns `false`, the task is not scheduled, and this function will be
+/// called on the next time slice.
+pub type EventPollFn = Box<dyn FnMut(&mut Task) -> bool + Send>;
+
 #[repr(C)]
 pub enum TaskState {
     RUNNING,
+    WAITING(EventPollFn),
     READY,
+    ZOMBIE,
 }
 
 impl Task {
@@ -35,6 +44,39 @@ impl Task {
                 stack: stack,
             }),
             None => None,
+        }
+    }
+
+    pub fn is_ready(&mut self) -> bool {
+        match self.state {
+            TaskState::READY => true,
+            TaskState::RUNNING => false,
+            TaskState::ZOMBIE => false,
+            TaskState::WAITING(_) => {
+                let state = replace(&mut self.state, TaskState::READY);
+                if let TaskState::WAITING(mut event_poll_fn) = state {
+                    if event_poll_fn(self) {
+                        true
+                    } else {
+                        self.state = TaskState::WAITING(event_poll_fn);
+                        false
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+    }
+
+    pub fn exit(&mut self) {
+        self.state = TaskState::ZOMBIE;
+        self.counter = 0;
+        self.priority = 0;
+        unsafe {
+            (&ALLOCATOR).lock().deallocate(
+                NonNull::new(self.stack.as_mut_ptr()).expect("non-null"),
+                Stack::layout(),
+            );
         }
     }
 }
@@ -52,7 +94,7 @@ impl Stack {
     pub const ALIGN: usize = 16;
 
     /// The default layout for a stack.
-    fn layout() -> Layout {
+    pub fn layout() -> Layout {
         unsafe { Layout::from_size_align_unchecked(Self::SIZE, Self::ALIGN) }
     }
 

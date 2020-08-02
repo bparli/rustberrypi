@@ -28,20 +28,28 @@ impl GlobalScheduler {
             .add_task(task)
     }
 
-    /// Performs a context switch using `tf` by setting the state of the current
-    /// process to `new_state`, saving `tf` into the current process, and
-    /// restoring the next process's trap frame into `tf`. For more details, see
-    /// the documentation on `Scheduler::switch()`.
-    pub fn switch(&self, ec: &mut exception::ExceptionContext) {
+    pub fn exit_task(&self, ec: &mut exception::ExceptionContext) {
         self.0
             .lock()
             .as_mut()
             .expect("scheduler uninitialized")
-            .switch(ec)
+            .exit_task(ec)
+    }
+
+    /// Performs a context switch using `tf` by setting the state of the current
+    /// process to `new_state`, saving `tf` into the current process, and
+    /// restoring the next process's trap frame into `tf`. For more details, see
+    /// the documentation on `Scheduler::switch()`.
+    pub fn switch(&self, update_state: TaskState, ec: &mut exception::ExceptionContext) {
+        self.0
+            .lock()
+            .as_mut()
+            .expect("scheduler uninitialized")
+            .switch(update_state, ec)
     }
 
     pub fn timer_tick(&self, e: &mut exception::ExceptionContext) {
-        exception::asynchronous::exec_with_irq_masked(|| self.switch(e))
+        exception::asynchronous::exec_with_irq_masked(|| self.switch(TaskState::READY, e))
     }
 }
 
@@ -92,14 +100,14 @@ impl Scheduler {
     ///
     /// This method blocks until there is a process to switch to, conserving
     /// energy as much as possible in the interim.
-    fn switch(&mut self, ec: &mut exception::ExceptionContext) {
+    fn switch(&mut self, update_state: TaskState, ec: &mut exception::ExceptionContext) {
         if self.current == Some(ec.tpidr) {
             if let Some(running) = self.processes.front_mut() {
                 running.counter -= 1;
                 if running.counter <= 0 {
                     let mut running = self.processes.pop_front().unwrap();
                     running.counter = 1;
-                    running.state = TaskState::READY;
+                    running.state = update_state;
                     *running.context = *ec;
                     flush_tlb(&running.stack);
                     self.processes.push_back(running);
@@ -113,7 +121,7 @@ impl Scheduler {
             let num_tasks = self.processes.len();
             for _ in 0..num_tasks {
                 let mut new_task = self.processes.pop_front().unwrap();
-                if new_task.state == TaskState::READY {
+                if new_task.is_ready() {
                     *ec = *new_task.context;
                     new_task.state = TaskState::RUNNING;
                     self.current = Some(ec.tpidr);
@@ -126,6 +134,17 @@ impl Scheduler {
             }
             unsafe { asm!("wfi") }
         }
+    }
+
+    fn exit_task(&mut self, ec: &mut exception::ExceptionContext) {
+        for task in self.processes.iter_mut() {
+            if task.pid == ec.tpidr {
+                // clean up task, dealloc stack
+                task.exit();
+                break;
+            }
+        }
+        self.switch(TaskState::ZOMBIE, ec);
     }
 }
 

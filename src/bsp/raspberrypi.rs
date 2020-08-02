@@ -15,7 +15,7 @@ static PL011_UART: device_driver::PL011Uart = unsafe {
     )
 };
 
-static SYSTEM_TIMER: device_driver::SystemTimer = unsafe {
+pub static SYSTEM_TIMER: device_driver::SystemTimer = unsafe {
     device_driver::SystemTimer::new(
         memory::map::mmio::SYS_TIMER_BASE,
         exception::asynchronous::irq_map::SYSTEM_TIMER,

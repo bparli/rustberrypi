@@ -5,7 +5,7 @@
 #![no_std]
 
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-use libkernel::{bsp, driver, exception, info, memory, process, sched, state, time, warn};
+use libkernel::{bsp, driver, exception, info, memory, process, sched, state, syscall, time, warn};
 extern crate alloc;
 use core::time::Duration;
 use memory::ALLOCATOR;
@@ -120,6 +120,7 @@ fn kernel_main() -> ! {
 
     process::add_user_process(process1);
     process::add_user_process(process2);
+    process::add_user_process(process4);
     process::add_kernel_process(process3);
     loop {}
 }
@@ -127,20 +128,30 @@ fn kernel_main() -> ! {
 fn process1() {
     loop {
         info!("forked proc numero uno");
+        syscall::sleep(2000);
+    }
+}
+
+fn process4() {
+    loop {
+        info!("forked proc numero uno");
         time::time_manager().spin_for(Duration::from_secs(2));
     }
 }
 
 fn process2() {
-    loop {
+    for _num in 0..3 {
         info!("forked proc dos");
-        time::time_manager().spin_for(Duration::from_secs(2));
+        syscall::sleep(2000);
     }
+
+    info!("forked proc dos is exiting");
+    syscall::exit();
 }
 
 fn process3() {
     loop {
-        info!("forked proc tres");
+        info!("forked kernel proc");
         time::time_manager().spin_for(Duration::from_secs(2));
     }
 }

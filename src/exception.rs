@@ -10,7 +10,8 @@ pub enum PrivilegeLevel {
     Unknown,
 }
 
-use crate::{bsp, exception};
+use crate::info;
+use crate::{bsp, exception, syscall};
 use core::fmt;
 use cortex_a::{barrier, regs::*};
 
@@ -58,14 +59,15 @@ fn default_exception_handler(e: &ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_synchronous(e: &mut ExceptionContext) {
-    use crate::info;
-    info!("Exception current_el0_synchronousfor proc {:?}", e.tpidr);
-    default_exception_handler(e);
+    info!("Exception current_el0_synchronous for proc {:?}", e.tpidr);
+    match syscall::handle(e) {
+        Ok(()) => {}
+        Err(_) => default_exception_handler(e),
+    }
 }
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_irq(e: &mut ExceptionContext) {
-    use crate::info;
     info!("Exception current_el0_irq for proc {:?}", e.tpidr);
     use exception::asynchronous::interface::IRQManager;
     let token = &exception::asynchronous::IRQContext::new();
@@ -88,7 +90,6 @@ unsafe extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
-    use crate::info;
     use exception::asynchronous::interface::IRQManager;
     info!("Exception current_elx_irq for proc {:?}", e.tpidr);
 

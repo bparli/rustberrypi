@@ -3,6 +3,7 @@ use core::time::Duration;
 use cortex_a::regs::*;
 
 const NS_PER_S: u64 = 1_000_000_000;
+const MS_PER_S: u64 = 1_000;
 
 /// ARMv8 Generic Timer.
 pub struct GenericTimer;
@@ -19,11 +20,18 @@ impl GenericTimer {
         Duration::from_nanos(NS_PER_S / (CNTFRQ_EL0.get() as u64))
     }
 
-    pub fn uptime(&self) -> Duration {
+    pub fn read(&self) -> u64 {
         let frq: u64 = CNTFRQ_EL0.get() as u64;
-        let current_count: u64 = CNTPCT_EL0.get() * NS_PER_S;
+        CNTPCT_EL0.get() * NS_PER_S / frq
+    }
 
-        Duration::from_nanos(current_count / frq)
+    pub fn read_ms(&self) -> u64 {
+        let frq: u64 = CNTFRQ_EL0.get() as u64;
+        CNTPCT_EL0.get() * MS_PER_S / frq
+    }
+
+    pub fn uptime(&self) -> Duration {
+        Duration::from_nanos(self.read())
     }
 
     pub fn spin_for(&self, duration: Duration) {

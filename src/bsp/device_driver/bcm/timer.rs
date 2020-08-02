@@ -131,6 +131,7 @@ impl exception::asynchronous::interface::IRQHandler for SystemTimer {
         data.handle();
 
         SCHEDULER.timer_tick(e);
+
         Ok(())
     }
 }
