@@ -24,7 +24,7 @@ unsafe fn kernel_init() -> ! {
         panic!("MMU: {}", string);
     }
 
-    // still not working yet for some reason
+    // still not working yet for some reason.  can't transition secondary cores to EL1
     //cpu::wake_up_secondary_cores();
 
     // enable the core's mmu
