@@ -1,4 +1,4 @@
-use crate::{bsp, driver, exception, sched};
+use crate::{bsp, driver, exception};
 use core::ops;
 use register::{mmio::*, register_bitfields, register_structs};
 use spin;
@@ -125,7 +125,7 @@ impl driver::interface::DeviceDriver for SystemTimer {
 
 impl exception::asynchronous::interface::IRQHandler for SystemTimer {
     fn handle(&self, e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
-        use sched::SCHEDULER;
+        use crate::sched::SCHEDULER;
 
         let mut data = self.inner.lock();
         data.handle();

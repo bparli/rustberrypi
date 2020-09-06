@@ -1,8 +1,3 @@
-/* SPDX-License-Identifier: MIT OR Apache-2.0
- *
- * Copyright (c) 2018-2020 Andre Richter <andre.o.richter@gmail.com>
- */
-
 SECTIONS
 {
     /* Set current address to the value from which the RPi starts execution */
@@ -25,15 +20,16 @@ SECTIONS
     {
         *(.data*)
     }
+    . = ALIGN(4096);
 
     /* Section is zeroed in u64 chunks, align start and end to 8 bytes */
-    .bss ALIGN(8):
+    .bss :
     {
         __bss_start = .;
         *(.bss*);
-        . = ALIGN(8);
         __bss_end = .;
     }
+    . = ALIGN(4096); 
 
     /DISCARD/ : { *(.comment*) }
 }

@@ -5,7 +5,7 @@ use crate::memory;
 use crate::{bsp::device_driver, console};
 use core::fmt;
 
-static GPIO: device_driver::GPIO =
+pub static GPIO: device_driver::GPIO =
     unsafe { device_driver::GPIO::new(memory::map::mmio::GPIO_BASE) };
 
 static PL011_UART: device_driver::PL011Uart = unsafe {

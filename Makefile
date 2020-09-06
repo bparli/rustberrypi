@@ -8,14 +8,14 @@ DEV_SERIAL ?= /dev/ttyUSB0
 UNAME_S = $(shell uname -s)
 
 # BSP-specific arguments
-TARGET            = aarch64-unknown-none-softfloat
+TARGET            = aarch64-unknown-none
 KERNEL_BIN        = kernel8.img
 QEMU_BINARY       = qemu-system-aarch64
 QEMU_MACHINE_TYPE = raspi3
 QEMU_RELEASE_ARGS = -serial stdio -display none
 QEMU_TEST_ARGS    = $(QEMU_RELEASE_ARGS) -semihosting
 LINKER_FILE       = src/link.ld
-RUSTC_MISC_ARGS   = -C target-cpu=cortex-a53
+RUSTC_MISC_ARGS   = -C target-cpu=cortex-a53 -C link-arg=--no-dynamic-linker 
 
 # Export for build.rs
 export LINKER_FILE
@@ -78,7 +78,7 @@ EXEC_MINIPUSH = ruby ./utils/minipush.rb
 all: $(KERNEL_BIN)
 
 $(KERNEL_ELF):
-	RUSTFLAGS="$(RUSTFLAGS_PEDANTIC)" $(RUSTC_CMD)
+	RUSTFLAGS="$(RUSTFLAGS)" $(RUSTC_CMD)
 
 $(KERNEL_BIN): $(KERNEL_ELF)
 	@$(OBJCOPY_CMD) $(KERNEL_ELF) $(KERNEL_BIN)

@@ -5,39 +5,39 @@
 #![no_std]
 
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-use libkernel::{bsp, driver, exception, info, memory, process, sched, state, syscall, time, warn};
+use cortex_a::asm;
+use libkernel::{bsp, cpu, driver, exception, info, memory, process, sched, syscall, time, warn};
 extern crate alloc;
 use core::time::Duration;
 use memory::ALLOCATOR;
 use sched::SCHEDULER;
 
-/// Early init code.
-///
-/// # Safety
-///
-/// - Only a single core must be active and running this function.
-/// - The init calls in this function must appear in the correct order:
-///     - Virtual memory must be activated before the device drivers.
-///       - Without it, any atomic operations, e.g. the yet-to-be-introduced spinlocks in the device
-///         drivers (which currently employ IRQSafeNullLocks instead of spinlocks), will fail to
-///         work on the RPi SoCs.
+// Early init code.
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
     use driver::interface::DriverManager;
 
-    exception::handling_init();
+    exception::asynchronous::local_fiq_mask();
+    exception::asynchronous::local_irq_mask();
 
     if let Err(string) = memory::mmu::init() {
         panic!("MMU: {}", string);
     }
 
+    // still not working yet for some reason
+    //cpu::wake_up_secondary_cores();
+
+    // enable the core's mmu
+    memory::mmu::core_setup();
+    
     for i in bsp::driver::driver_manager().all_device_drivers().iter() {
         if i.init().is_err() {
             panic!("Error loading driver: {}", i.compatible())
         }
     }
+
     bsp::driver::driver_manager().post_device_driver_init();
-    // println! is usable from here on.
+    //println! is usable from here on.
 
     // Let device drivers register and enable their handlers with the interrupt controller.
     for i in bsp::driver::driver_manager().all_device_drivers() {
@@ -46,26 +46,27 @@ unsafe fn kernel_init() -> ! {
         }
     }
 
-    // Unmask interrupts on the boot CPU core.
-    exception::asynchronous::local_irq_unmask();
-
-    // Announce conclusion of the kernel_init() phase.
-    state::state_manager().transition_to_single_core_main();
-
     ALLOCATOR
         .lock()
         .init(memory::map::virt::HEAP_START, memory::heap_size());
+
+    // Unmask interrupts on the boot CPU core.
+    exception::asynchronous::local_irq_unmask();
+    exception::asynchronous::local_fiq_unmask();
+
     SCHEDULER.init();
 
-    // Transition from unsafe to safe.
+    asm::sev();
+
     kernel_main()
 }
 
-/// The main function running after the early init.
+// The main function running after the early init.
 fn kernel_main() -> ! {
     use driver::interface::DriverManager;
     use exception::asynchronous::interface::IRQManager;
 
+    //time::time_manager().spin_for(Duration::from_secs(2));
     info!("Booting on: {}", bsp::board_name());
 
     info!("MMU online. Special regions:");
@@ -127,21 +128,21 @@ fn kernel_main() -> ! {
 
 fn process1() {
     loop {
-        info!("forked proc numero uno");
+        //info!("forked proc numero uno");
         syscall::sleep(2000);
     }
 }
 
 fn process4() {
     loop {
-        info!("forked proc numero uno");
+        //info!("forked proc numero uno");
         time::time_manager().spin_for(Duration::from_secs(2));
     }
 }
 
 fn process2() {
     for _num in 0..3 {
-        info!("forked proc dos");
+        //info!("forked proc dos");
         syscall::sleep(2000);
     }
 
@@ -151,7 +152,8 @@ fn process2() {
 
 fn process3() {
     loop {
-        info!("forked kernel proc");
+        info!("forked kernel proc {}", cpu::core_id::<usize>());
+        asm::sev();
         time::time_manager().spin_for(Duration::from_secs(2));
     }
 }

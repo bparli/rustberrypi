@@ -36,6 +36,7 @@ pub mod map {
     pub const GPIO_OFFSET:                              usize =        0x0020_0000;
     pub const UART_OFFSET:                              usize =        0x0020_1000;
     pub const SYS_TIMER_OFFSET:                         usize =        0x0000_3000;
+    pub const MINI_UART_OFFSET:                         usize =        0x0021_5000;
 
     /// Physical devices.
     pub mod mmio {
@@ -45,6 +46,7 @@ pub mod map {
         pub const PERIPHERAL_INTERRUPT_CONTROLLER_BASE: usize = BASE + 0x0000_B200;
         pub const GPIO_BASE:                            usize = BASE + GPIO_OFFSET;
         pub const PL011_UART_BASE:                      usize = BASE + UART_OFFSET;
+        pub const MINI_UART_BASE:                       usize = BASE + MINI_UART_OFFSET;
         pub const SYS_TIMER_BASE:                       usize = BASE + SYS_TIMER_OFFSET;
         pub const LOCAL_INTERRUPT_CONTROLLER_BASE:      usize =        0x4000_0000;
         pub const END_INCLUSIVE:                        usize =        0x4000_FFFF;

@@ -130,6 +130,7 @@ pub fn exec_with_irq_masked<T>(f: impl FnOnce() -> T) -> T {
 
 mod daif_bits {
     pub const IRQ: u8 = 0b0010;
+    pub const FIQ: u8 = 0b0001;
 }
 
 trait DaifField {
@@ -206,6 +207,26 @@ pub unsafe fn local_irq_mask() {
     asm!(
         "msr DAIFSet, {arg}",
         arg = const daif_bits::IRQ,
+        options(nomem, nostack, preserves_flags)
+    );
+}
+
+#[inline(always)]
+pub unsafe fn local_fiq_unmask() {
+    #[rustfmt::skip]
+    asm!(
+        "msr DAIFClr, {arg}",
+        arg = const daif_bits::FIQ,
+        options(nomem, nostack, preserves_flags)
+    );
+}
+
+#[inline(always)]
+pub unsafe fn local_fiq_mask() {
+    #[rustfmt::skip]
+    asm!(
+        "msr DAIFSet, {arg}",
+        arg = const daif_bits::FIQ,
         options(nomem, nostack, preserves_flags)
     );
 }

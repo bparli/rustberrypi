@@ -36,7 +36,6 @@ pub mod memory;
 pub mod print;
 pub mod process;
 pub mod sched;
-pub mod state;
 pub mod syscall;
 pub mod time;
 

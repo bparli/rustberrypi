@@ -13,7 +13,7 @@ pub enum PrivilegeLevel {
 use crate::info;
 use crate::{bsp, exception, syscall};
 use core::fmt;
-use cortex_a::{barrier, regs::*};
+use cortex_a::regs::*;
 
 // Assembly counterpart to this file.
 global_asm!(include_str!("exception.S"));
@@ -68,7 +68,7 @@ unsafe extern "C" fn current_el0_synchronous(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_irq(e: &mut ExceptionContext) {
-    info!("Exception current_el0_irq for proc {:?}", e.tpidr);
+    //info!("Exception current_el0_irq for proc {:?}", e.tpidr);
     use exception::asynchronous::interface::IRQManager;
     let token = &exception::asynchronous::IRQContext::new();
     bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
@@ -91,7 +91,7 @@ unsafe extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 #[no_mangle]
 unsafe extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
     use exception::asynchronous::interface::IRQManager;
-    info!("Exception current_elx_irq for proc {:?}", e.tpidr);
+    //info!("Exception current_elx_irq for proc {:?}", e.tpidr);
 
     let token = &exception::asynchronous::IRQContext::new();
     bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
@@ -202,27 +202,6 @@ pub fn current_privilege_level() -> (PrivilegeLevel, &'static str) {
         Some(CurrentEL::EL::Value::EL0) => (PrivilegeLevel::User, "EL0"),
         _ => (PrivilegeLevel::Unknown, "Unknown"),
     }
-}
-
-/// Init exception handling by setting the exception vector base address register.
-///
-/// # Safety
-///
-/// - Changes the HW state of the executing core.
-/// - The vector table and the symbol `__exception_vector_table_start` from the linker script must
-///   adhere to the alignment and size constraints demanded by the ARMv8-A Architecture Reference
-///   Manual.
-pub unsafe fn handling_init() {
-    // Provided by exception.S.
-    extern "C" {
-        static mut __exception_vector_start: u64;
-    }
-    let addr: u64 = &__exception_vector_start as *const _ as u64;
-
-    VBAR_EL1.set(addr);
-
-    // Force VBAR update to complete before next instruction.
-    barrier::isb(barrier::SY);
 }
 
 //--------------------------------------------------------------------------------------------------
