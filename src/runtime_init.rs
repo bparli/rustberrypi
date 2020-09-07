@@ -122,15 +122,8 @@ defreg!(
     ]
 );
 
-
 // (ref: C5.2.7 Exception Link Register EL3)
 defreg!(ELR_EL3);
-
-// (ref: D7.2.19 Architectural Feature Trap Register EL2)
-defreg!(CPTR_EL2);
-// (ref: D7.2.18 Architectural Feature Access Control Register)
-defreg!(CPACR_EL1);
-
 
 // (ref: D7.2.88 System Control Register)
 defreg!(
@@ -157,34 +150,6 @@ defreg!(
         RES1[29 - 28 | 23 - 22 | 20 - 20 | 11 - 11],
     ]
 );
-
-defreg!(SP_EL3);
-
-
-// (ref: D7.5.9 Counter-timer Kernel Control Register)
-defreg!(
-    CNTKCTL_EL1,
-    [
-        EL0PTEN[09 - 09],  // When 0, traps EL0 access to the physical timer to EL1
-        EL0VTEN[08 - 08],  // When 0, traps EL0 access to the virtual timer to EL1
-        EVNTI[07 - 04], // Select which bit of the counter register CNTVCT_EL0 is the trigger for the event stream generated from that counter when that event stream is enabled
-        EVNTDIR[03 - 03], // Controls which traisition of the counter register CNTVCT_EL0 trigger bit generates an event when the event stream is enabled
-        EVNTEN[02 - 02], // Enables the generation of an event stream from the counter register CNTVCT_EL0
-        EL0VCTEN[01 - 01], // When 0, traps EL0 access to the virtual timer control to EL1
-        EL0PCTEN[00 - 00], // When 0, traps EL0 access to the physical timer control to EL1
-    ]
-);
-
-// (ref: D7.5.10 Counter-timer Physical Timer Control Register)
-defreg!(
-    CNTP_CTL_EL0,
-    [
-        ISTATUS[02 - 02], // Indicates whether the timer condition is met
-        IMASK[01 - 01],   // Mask the timer interrupt
-        ENABLE[00 - 00],  // Enable the timer
-    ]
-);
-
 
 //--------------------------------------------------------------------------------------------------
 // Testing

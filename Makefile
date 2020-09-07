@@ -8,7 +8,7 @@ DEV_SERIAL ?= /dev/ttyUSB0
 UNAME_S = $(shell uname -s)
 
 # BSP-specific arguments
-TARGET            = aarch64-unknown-none
+TARGET            = aarch64-unknown-none-softfloat
 KERNEL_BIN        = kernel8.img
 QEMU_BINARY       = qemu-system-aarch64
 QEMU_MACHINE_TYPE = raspi3

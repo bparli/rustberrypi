@@ -44,6 +44,7 @@ where
 ///
 /// - Linker script must ensure to place this function at `0x80_000`.
 #[no_mangle]
+#[naked]
 pub unsafe extern "C" fn _start() -> ! {
     if BOOT_CORE_ID == core_id() {
         SP.set(BOOT_CORE_STACK_START);
@@ -83,12 +84,8 @@ unsafe fn el2_to_el1() {
         // Set EL1 execution state to AArch64.
         HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64);
 
-        // settings for registers not in cotrex-a crate
-        runtime_init::CPTR_EL2.set(0);
-        runtime_init::CPACR_EL1.set(runtime_init::CPACR_EL1.get() | (0b11 << 20));
-
-        // Set SCTLR to known state 
-        runtime_init::SCTLR_EL1.set(runtime_init::SCTLR_EL1::RES1); 
+        // Set SCTLR to known state
+        runtime_init::SCTLR_EL1.set(runtime_init::SCTLR_EL1::RES1);
 
         VBAR_EL1.set(&__exception_vector_start as *const _ as u64);
 
@@ -105,7 +102,7 @@ unsafe fn el2_to_el1() {
         );
 
         // eret to itself, expecting current_el() == 1 this time.
-        ELR_EL2.set(el2_to_el1  as *const () as u64);
+        ELR_EL2.set(el2_to_el1 as *const () as u64);
         asm::eret();
     }
 }
@@ -114,11 +111,22 @@ unsafe fn el2_to_el1() {
 unsafe fn el3_to_el2() {
     if CurrentEL.get() == CurrentEL::EL::EL3.value {
         // set up Secure Configuration Register (D13.2.10)
-        runtime_init::SCR_EL3.set(runtime_init::SCR_EL3::NS | runtime_init::SCR_EL3::SMD | runtime_init::SCR_EL3::HCE | runtime_init::SCR_EL3::RW | runtime_init::SCR_EL3::RES1);
+        runtime_init::SCR_EL3.set(
+            runtime_init::SCR_EL3::NS
+                | runtime_init::SCR_EL3::SMD
+                | runtime_init::SCR_EL3::HCE
+                | runtime_init::SCR_EL3::RW
+                | runtime_init::SCR_EL3::RES1,
+        );
 
         // set up Saved Program Status Regiser (C5.2.19)
-        runtime_init::SPSR_EL3
-            .set((runtime_init::SPSR_EL3::M & 0b1001) | runtime_init::SPSR_EL3::F | runtime_init::SPSR_EL3::I | runtime_init::SPSR_EL3::A | runtime_init::SPSR_EL3::D);
+        runtime_init::SPSR_EL3.set(
+            (runtime_init::SPSR_EL3::M & 0b1001)
+                | runtime_init::SPSR_EL3::F
+                | runtime_init::SPSR_EL3::I
+                | runtime_init::SPSR_EL3::A
+                | runtime_init::SPSR_EL3::D,
+        );
 
         // eret to itself,EL == 2 this time.
         runtime_init::ELR_EL3.set(el3_to_el2 as *const () as u64);
@@ -148,7 +156,7 @@ pub unsafe fn wake_up_secondary_cores() {
     asm::sev();
     for core_index in 1..=3 {
         let core_spin_ptr = SPINNING_BASE.add(core_index);
-        while read_volatile(core_spin_ptr as *const usize) !=0  {
+        while read_volatile(core_spin_ptr as *const usize) != 0 {
             //spin
         }
     }
@@ -162,6 +170,7 @@ pub fn wait_forever() -> ! {
 }
 
 #[no_mangle]
+#[naked]
 unsafe extern "C" fn start2() -> ! {
     SP.set(BOOT_CORE_STACK_START - (4096 * core_id::<usize>() as u64));
     el3_to_el2();
@@ -173,7 +182,6 @@ unsafe fn kmain2() -> ! {
     use crate::memory;
     write_volatile(SPINNING_BASE.add(core_id::<usize>()), 0);
     memory::mmu::core_setup();
-    
     loop {
         asm::wfe();
     }

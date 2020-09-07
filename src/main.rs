@@ -17,19 +17,15 @@ use sched::SCHEDULER;
 unsafe fn kernel_init() -> ! {
     use driver::interface::DriverManager;
 
-    exception::asynchronous::local_fiq_mask();
-    exception::asynchronous::local_irq_mask();
-
     if let Err(string) = memory::mmu::init() {
         panic!("MMU: {}", string);
     }
 
-    // still not working yet for some reason.  can't transition secondary cores to EL1
-    //cpu::wake_up_secondary_cores();
+    // finally working
+    cpu::wake_up_secondary_cores();
 
     // enable the core's mmu
     memory::mmu::core_setup();
-    
     for i in bsp::driver::driver_manager().all_device_drivers().iter() {
         if i.init().is_err() {
             panic!("Error loading driver: {}", i.compatible())
