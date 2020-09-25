@@ -1,5 +1,7 @@
-use crate::{bsp, driver, exception};
+use crate::{bsp, cpu, driver, exception};
 use core::ops;
+use core::time::Duration;
+use cortex_a::regs::*;
 use register::{mmio::*, register_bitfields, register_structs};
 use spin;
 
@@ -131,6 +133,65 @@ impl exception::asynchronous::interface::IRQHandler for SystemTimer {
         data.handle();
 
         SCHEDULER.timer_tick(e);
+
+        Ok(())
+    }
+}
+
+pub struct LocalTimer {
+    interval: u64,
+    irq_number: bsp::device_driver::IRQNumber,
+}
+
+impl LocalTimer {
+    pub const unsafe fn new(irq_number: bsp::device_driver::IRQNumber) -> Self {
+        Self {
+            interval: 2000,
+            irq_number: irq_number,
+        }
+    }
+
+    pub fn init(&self) {
+        self.tick();
+    }
+
+    pub fn register_and_enable_irq_handler(&'static self) -> Result<(), &'static str> {
+        use bsp::exception::asynchronous::irq_manager;
+        use exception::asynchronous::{interface::IRQManager, IRQDescriptor};
+
+        // setup irq handler for local timer
+        let descriptor = IRQDescriptor {
+            name: "Local Timer",
+            handler: self,
+        };
+
+        irq_manager().register_handler(self.irq_number, descriptor)?;
+        irq_manager().enable(self.irq_number);
+        self.tick();
+        Ok(())
+    }
+
+    fn tick(&self) {
+        use core::convert::TryInto;
+        let timer_frequency = CNTFRQ_EL0.get() as u64;
+        let interval = Duration::from_millis(self.interval);
+        let ticks = (timer_frequency * interval.as_nanos() as u64) / 1_000_000_000;
+        CNTP_TVAL_EL0.set(ticks.try_into().unwrap());
+        CNTP_CTL_EL0.modify(CNTP_CTL_EL0::ENABLE::SET + CNTP_CTL_EL0::IMASK::CLEAR);
+    }
+}
+
+impl exception::asynchronous::interface::IRQHandler for LocalTimer {
+    fn handle(&self, e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
+        use crate::sched::SCHEDULER;
+
+        use crate::info;
+        info!(
+            "Local timer tick called on core {}",
+            cpu::core_id::<usize>()
+        );
+        //SCHEDULER.timer_tick(e);
+        self.tick();
 
         Ok(())
     }

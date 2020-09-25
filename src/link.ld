@@ -13,23 +13,23 @@ SECTIONS
     {
         *(.rodata*)
     }
-    . = ALIGN(4096); /* Fill up to 64 KiB */
+    . = ALIGN(65536); /* Fill up to 64 KiB */
     __ro_end = .;
 
     .data :
     {
         *(.data*)
     }
-    . = ALIGN(4096);
 
     /* Section is zeroed in u64 chunks, align start and end to 8 bytes */
-    .bss :
+    .bss ALIGN(8):
     {
         __bss_start = .;
         *(.bss*);
+        . =ALIGN(8);
         __bss_end = .;
     }
-    . = ALIGN(4096); 
+    __text_end = ALIGN(65536);
 
     /DISCARD/ : { *(.comment*) }
 }

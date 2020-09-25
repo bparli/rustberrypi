@@ -1,6 +1,7 @@
+pub mod local_ic;
 mod peripheral_ic;
 
-use crate::{driver, exception};
+use crate::{cpu, driver, exception};
 
 /// Wrapper struct for a bitmask indicating pending IRQ numbers.
 struct PendingIRQs {
@@ -22,6 +23,7 @@ pub enum IRQNumber {
 /// Representation of the Interrupt Controller.
 pub struct InterruptController {
     periph: peripheral_ic::PeripheralIC,
+    local: local_ic::LocalIC,
 }
 
 impl PendingIRQs {
@@ -51,15 +53,17 @@ impl InterruptController {
     const MAX_LOCAL_IRQ_NUMBER: usize = 11;
     const MAX_PERIPHERAL_IRQ_NUMBER: usize = 63;
     const NUM_PERIPHERAL_IRQS: usize = Self::MAX_PERIPHERAL_IRQ_NUMBER + 1;
+    const NUM_LOCAL_IRQS: usize = Self::MAX_LOCAL_IRQ_NUMBER + 1;
 
     /// Create an instance.
     ///
     /// # Safety
     ///
     /// - The user must ensure to provide the correct `base_addr`.
-    pub const unsafe fn new(_local_base_addr: usize, periph_base_addr: usize) -> Self {
+    pub const unsafe fn new(local_base_addr: usize, periph_base_addr: usize) -> Self {
         Self {
             periph: peripheral_ic::PeripheralIC::new(periph_base_addr),
+            local: local_ic::LocalIC::new(local_base_addr),
         }
     }
 }
@@ -83,15 +87,15 @@ impl exception::asynchronous::interface::IRQManager for InterruptController {
         descriptor: exception::asynchronous::IRQDescriptor,
     ) -> Result<(), &'static str> {
         match irq {
-            IRQNumber::Local(_) => unimplemented!("Local IRQ controller not implemented."),
+            IRQNumber::Local(lirq) => self.local.register_handler(lirq, descriptor),
             IRQNumber::Peripheral(pirq) => self.periph.register_handler(pirq, descriptor),
         }
     }
 
     fn enable(&self, irq: Self::IRQNumberType) {
         match irq {
-            IRQNumber::Local(_) => unimplemented!("Local IRQ controller not implemented."),
             IRQNumber::Peripheral(pirq) => self.periph.enable(pirq),
+            IRQNumber::Local(lirq) => self.local.enable(lirq),
         }
     }
 
@@ -101,10 +105,14 @@ impl exception::asynchronous::interface::IRQManager for InterruptController {
         e: &mut exception::ExceptionContext,
     ) {
         // It can only be a peripheral IRQ pending because enable() does not support local IRQs yet.
-        self.periph.handle_pending_irqs(ic, e)
+        if cpu::core_id::<usize>() == 0 {
+            self.periph.handle_pending_irqs(ic, e);
+        }
+        self.local.handle_pending_irqs(ic, e);
     }
 
     fn print_handler(&self) {
         self.periph.print_handler();
+        self.local.print_handler();
     }
 }

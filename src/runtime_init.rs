@@ -125,6 +125,9 @@ defreg!(
 // (ref: C5.2.7 Exception Link Register EL3)
 defreg!(ELR_EL3);
 
+// (ref: D7.5.2 Counter-timer Hypervisor Control Register)
+defreg!(CNTHCTL_EL2, [EL0VCTEN[1 - 1], EL0PCTEN[0 - 0],]);
+
 // (ref: D7.2.88 System Control Register)
 defreg!(
     SCTLR_EL1,

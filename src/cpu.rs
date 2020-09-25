@@ -1,5 +1,4 @@
-//use crate::info;
-use crate::runtime_init;
+use crate::{bsp, exception, runtime_init};
 use core::ptr::{read_volatile, write_volatile};
 use cortex_a::{asm, regs::*};
 
@@ -16,6 +15,18 @@ pub const NUM_CORES: usize = 4;
 pub const SPINNING_BASE: *mut usize = 0xd8 as *mut usize;
 
 global_asm!(include_str!("exception.S"));
+
+static CORE1_TIMER: bsp::device_driver::LocalTimer = unsafe {
+    bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
+};
+
+static CORE2_TIMER: bsp::device_driver::LocalTimer = unsafe {
+    bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
+};
+
+static CORE3_TIMER: bsp::device_driver::LocalTimer = unsafe {
+    bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
+};
 
 //--------------------------------------------------------------------------------------------------
 // Public Code
@@ -76,6 +87,12 @@ unsafe fn el2_to_el1() {
         SP_EL1.set(SP.get() as u64);
 
         // Enable timer counter registers for EL1.
+        runtime_init::CNTHCTL_EL2.set(
+            runtime_init::CNTHCTL_EL2.get()
+                | runtime_init::CNTHCTL_EL2::EL0VCTEN
+                | runtime_init::CNTHCTL_EL2::EL0PCTEN,
+        );
+
         CNTHCTL_EL2.write(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
 
         // No offset for reading the counters.
@@ -182,8 +199,36 @@ unsafe fn kmain2() -> ! {
     use crate::memory;
     write_volatile(SPINNING_BASE.add(core_id::<usize>()), 0);
     memory::mmu::core_setup();
+
+    init_core_timer();
+    exception::asynchronous::local_irq_unmask();
     loop {
-        asm::wfe();
+        asm::wfi();
+    }
+}
+
+fn init_core_timer() {
+    use crate::warn;
+    match core_id::<usize>() {
+        1 => {
+            //CORE1_TIMER.init();
+            if let Err(mssg) = CORE1_TIMER.register_and_enable_irq_handler() {
+                warn!("Error registering IRQ handler: {}", mssg);
+            }
+        }
+        2 => {
+            //CORE2_TIMER.init();
+            if let Err(mssg) = CORE2_TIMER.register_and_enable_irq_handler() {
+                warn!("Error registering IRQ handler: {}", mssg);
+            }
+        }
+        3 => {
+            //CORE3_TIMER.init();
+            if let Err(mssg) = CORE3_TIMER.register_and_enable_irq_handler() {
+                warn!("Error registering IRQ handler: {}", mssg);
+            }
+        }
+        _ => warn!("Received wrong core in timer init: {}", core_id::<usize>()),
     }
 }
 

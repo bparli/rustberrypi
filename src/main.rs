@@ -1,5 +1,3 @@
-//! The `kernel` binary.
-
 #![feature(format_args_nl)]
 #![no_main]
 #![no_std]
@@ -12,12 +10,17 @@ use core::time::Duration;
 use memory::ALLOCATOR;
 use sched::SCHEDULER;
 
+static CORE0_TIMER: bsp::device_driver::LocalTimer = unsafe {
+    bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
+};
+
 // Early init code.
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
     use driver::interface::DriverManager;
+    use memory::mmu::interface::MMU;
 
-    if let Err(string) = memory::mmu::init() {
+    if let Err(string) = memory::mmu::mmu().init() {
         panic!("MMU: {}", string);
     }
 
@@ -26,6 +29,7 @@ unsafe fn kernel_init() -> ! {
 
     // enable the core's mmu
     memory::mmu::core_setup();
+
     for i in bsp::driver::driver_manager().all_device_drivers().iter() {
         if i.init().is_err() {
             panic!("Error loading driver: {}", i.compatible())
@@ -35,24 +39,27 @@ unsafe fn kernel_init() -> ! {
     bsp::driver::driver_manager().post_device_driver_init();
     //println! is usable from here on.
 
-    // Let device drivers register and enable their handlers with the interrupt controller.
+    //Let device drivers register and enable their handlers with the interrupt controller.
     for i in bsp::driver::driver_manager().all_device_drivers() {
         if let Err(msg) = i.register_and_enable_irq_handler() {
             warn!("Error registering IRQ handler: {}", msg);
         }
     }
 
-    ALLOCATOR
-        .lock()
-        .init(memory::map::virt::HEAP_START, memory::heap_size());
+    let (_, privilege_level) = exception::current_privilege_level();
+    info!("Current privilege level: {}", privilege_level);
+
+    if let Err(mssg) = CORE0_TIMER.register_and_enable_irq_handler() {
+        warn!("Error registering IRQ handler: {}", mssg);
+    }
+
+    let (heap_start, heap_end) = memory::heap_map().expect("failed to derive heap map");
+    ALLOCATOR.lock().init(heap_start, heap_end - heap_start);
 
     // Unmask interrupts on the boot CPU core.
     exception::asynchronous::local_irq_unmask();
-    exception::asynchronous::local_fiq_unmask();
 
     SCHEDULER.init();
-
-    asm::sev();
 
     kernel_main()
 }
@@ -62,11 +69,10 @@ fn kernel_main() -> ! {
     use driver::interface::DriverManager;
     use exception::asynchronous::interface::IRQManager;
 
-    //time::time_manager().spin_for(Duration::from_secs(2));
     info!("Booting on: {}", bsp::board_name());
 
     info!("MMU online. Special regions:");
-    memory::print_layout();
+    memory::virt_mem_layout().print_layout();
 
     let (_, privilege_level) = exception::current_privilege_level();
     info!("Current privilege level: {}", privilege_level);
@@ -124,21 +130,21 @@ fn kernel_main() -> ! {
 
 fn process1() {
     loop {
-        //info!("forked proc numero uno");
+        info!("forked proc numero uno");
         syscall::sleep(2000);
     }
 }
 
 fn process4() {
     loop {
-        //info!("forked proc numero uno");
+        info!("forked proc numero uno");
         time::time_manager().spin_for(Duration::from_secs(2));
     }
 }
 
 fn process2() {
     for _num in 0..3 {
-        //info!("forked proc dos");
+        info!("forked proc dos");
         syscall::sleep(2000);
     }
 

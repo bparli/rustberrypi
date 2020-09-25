@@ -119,7 +119,10 @@ impl exception::asynchronous::interface::IRQManager for PeripheralIC {
         let table = &self.handler_table.read();
         for irq_number in self.get_pending() {
             match table[irq_number] {
-                None => panic!("No handler registered for IRQ {}", irq_number),
+                None => panic!(
+                    "Peripheral Interrupt Controller: No handler registered for IRQ {}",
+                    irq_number
+                ),
                 Some(descriptor) => {
                     // Call the IRQ handler. Panics on failure.
                     descriptor.handler.handle(e).expect("Error handling IRQ");

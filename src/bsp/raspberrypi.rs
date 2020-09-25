@@ -1,3 +1,4 @@
+pub mod atags;
 pub mod driver;
 pub mod exception;
 
@@ -22,7 +23,10 @@ pub static SYSTEM_TIMER: device_driver::SystemTimer = unsafe {
     )
 };
 
-static INTERRUPT_CONTROLLER: device_driver::InterruptController = unsafe {
+// pub static LOCAL_TIMER: device_driver::LocalTimer =
+//     unsafe { device_driver::LocalTimer::new(exception::asynchronous::irq_map::LOCAL_TIMER) };
+
+pub static INTERRUPT_CONTROLLER: device_driver::InterruptController = unsafe {
     device_driver::InterruptController::new(
         memory::map::mmio::LOCAL_INTERRUPT_CONTROLLER_BASE,
         memory::map::mmio::PERIPHERAL_INTERRUPT_CONTROLLER_BASE,
