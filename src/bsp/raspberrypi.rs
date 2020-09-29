@@ -23,8 +23,11 @@ pub static SYSTEM_TIMER: device_driver::SystemTimer = unsafe {
     )
 };
 
-// pub static LOCAL_TIMER: device_driver::LocalTimer =
-//     unsafe { device_driver::LocalTimer::new(exception::asynchronous::irq_map::LOCAL_TIMER) };
+// get an instance to the generic system timer
+// for reading time
+pub fn generic_timer() -> device_driver::GenericSystemTimer {
+    unsafe { device_driver::GenericSystemTimer::new(memory::map::mmio::SYS_TIMER_BASE) }
+}
 
 pub static INTERRUPT_CONTROLLER: device_driver::InterruptController = unsafe {
     device_driver::InterruptController::new(

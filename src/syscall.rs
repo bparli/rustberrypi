@@ -1,23 +1,28 @@
+use crate::bsp::generic_timer;
 use crate::exception::{self, ExceptionContext};
 use crate::process::{Task, TaskState};
 use crate::sched::SCHEDULER;
-use crate::time; //generic timer
 use alloc::boxed::Box;
+use core::time::Duration;
 
 fn sleep_task(ms: u64, ec: &mut ExceptionContext) {
-    let begin = time::time_manager().read_ms();
-    let time = begin + ms as u64;
+    let timer = generic_timer();
+    let begin = timer.current_time();
+    let target_time = begin + Duration::from_millis(ms as u64);
     let polling_fn = Box::new(move |task: &mut Task| {
-        let current = time::time_manager().read_ms();
-        if current > time {
+        let current = timer.current_time();
+        if current > target_time {
             task.context.gpr[7] = 0; // x7 = 0; succeed
-            task.context.gpr[0] = current - begin; // x0 = elapsed time in ms
+            task.context.gpr[0] = (current - begin).as_millis() as u64; // x0 = elapsed time in ms
             true
         } else {
             false
         }
     });
-    SCHEDULER.switch(TaskState::WAITING(polling_fn), ec);
+
+    exception::asynchronous::exec_with_irq_masked(|| {
+        SCHEDULER.switch(TaskState::WAITING(polling_fn), ec)
+    })
 }
 
 fn exit_task(ec: &mut ExceptionContext) {
@@ -28,7 +33,7 @@ pub fn handle(ec: &mut ExceptionContext) -> Result<(), &str> {
     match ec.gpr[8] {
         1 => {
             // Sleep syscall
-            sleep_task(ec.gpr[0], ec);
+            exception::asynchronous::exec_with_irq_masked(|| sleep_task(ec.gpr[0], ec));
             Ok(())
         }
         2 => {

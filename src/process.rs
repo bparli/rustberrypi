@@ -53,18 +53,32 @@ impl Task {
             TaskState::RUNNING => false,
             TaskState::ZOMBIE => false,
             TaskState::WAITING(_) => {
-                let state = replace(&mut self.state, TaskState::READY);
-                if let TaskState::WAITING(mut event_poll_fn) = state {
-                    if event_poll_fn(self) {
-                        true
-                    } else {
-                        self.state = TaskState::WAITING(event_poll_fn);
-                        false
-                    }
-                } else {
-                    unreachable!();
+                let mut current_state = replace(&mut self.state, TaskState::READY);
+                let current_ready = match current_state {
+                    TaskState::WAITING(ref mut event_pol_fn) => event_pol_fn(self),
+                    TaskState::READY => true,
+                    _ => false,
+                };
+                if !current_ready {
+                    self.state = current_state;
                 }
+                current_ready
             }
+            _ => false,
+        }
+    }
+
+    pub fn is_waiting(&mut self) -> bool {
+        match self.state {
+            TaskState::WAITING(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_running(&mut self) -> bool {
+        match self.state {
+            TaskState::RUNNING => true,
+            _ => false,
         }
     }
 
@@ -87,7 +101,7 @@ pub struct Stack {
 }
 
 impl Stack {
-    /// The default stack size is 4kb.
+    /// The default stack size is 64kb.
     pub const SIZE: usize = 1 << 12;
 
     /// The default stack alignment is 16 bytes.
@@ -95,7 +109,7 @@ impl Stack {
 
     /// The default layout for a stack.
     pub fn layout() -> Layout {
-        unsafe { Layout::from_size_align_unchecked(Self::SIZE, Self::ALIGN) }
+        Layout::from_size_align(Self::SIZE, Self::ALIGN).unwrap()
     }
 
     /// Returns a newly allocated process stack, zeroed out, if one could be
@@ -129,17 +143,6 @@ impl Stack {
     /// Returns the physical address of bottom of the stack.
     pub fn bottom(&self) -> PhysicalAddr {
         unsafe { self.as_mut_ptr().into() }
-    }
-}
-
-impl Drop for Stack {
-    fn drop(&mut self) {
-        unsafe {
-            (&ALLOCATOR).lock().deallocate(
-                NonNull::new(self.as_mut_ptr()).expect("non-null"),
-                Self::layout(),
-            );
-        }
     }
 }
 

@@ -27,6 +27,7 @@ For more convenient development, copy `/ext/kernel8.img` to sd boot partition an
 * Process scheduler and context switching
 * User level kernel level processes/tasks
 * Syscalls suport (only exit and sleep for now)
+* Multi-core
 
 ## Acknowledgements
 

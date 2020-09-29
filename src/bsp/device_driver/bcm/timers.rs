@@ -1,4 +1,4 @@
-use crate::{bsp, cpu, driver, exception};
+use crate::{bsp, driver, exception};
 use core::ops;
 use core::time::Duration;
 use cortex_a::regs::*;
@@ -126,15 +126,41 @@ impl driver::interface::DeviceDriver for SystemTimer {
 }
 
 impl exception::asynchronous::interface::IRQHandler for SystemTimer {
-    fn handle(&self, e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
-        use crate::sched::SCHEDULER;
-
+    fn handle(&self, _e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
         let mut data = self.inner.lock();
         data.handle();
 
-        SCHEDULER.timer_tick(e);
+        //crate::sched::SCHEDULER.timer_tick(_e);
 
         Ok(())
+    }
+}
+
+pub struct GenericSystemTimer {
+    base_addr: usize,
+}
+
+impl GenericSystemTimer {
+    pub const unsafe fn new(base_addr: usize) -> Self {
+        Self { base_addr }
+    }
+
+    fn ptr(&self) -> *const RegisterBlock {
+        self.base_addr as *const _
+    }
+
+    pub fn current_time(&self) -> Duration {
+        let low = self.CLO.get();
+        let high = self.CHI.get();
+        Duration::from_micros(((high as u64) << 32) | low as u64)
+    }
+}
+
+impl ops::Deref for GenericSystemTimer {
+    type Target = RegisterBlock;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.ptr() }
     }
 }
 
@@ -146,9 +172,13 @@ pub struct LocalTimer {
 impl LocalTimer {
     pub const unsafe fn new(irq_number: bsp::device_driver::IRQNumber) -> Self {
         Self {
-            interval: 2000,
+            interval: 200, // in milliseconds
             irq_number: irq_number,
         }
+    }
+
+    pub fn resolution(&self) -> Duration {
+        Duration::from_nanos(1_000_000_000 / (CNTFRQ_EL0.get() as u64))
     }
 
     pub fn init(&self) {
@@ -184,13 +214,7 @@ impl LocalTimer {
 impl exception::asynchronous::interface::IRQHandler for LocalTimer {
     fn handle(&self, e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
         use crate::sched::SCHEDULER;
-
-        use crate::info;
-        info!(
-            "Local timer tick called on core {}",
-            cpu::core_id::<usize>()
-        );
-        //SCHEDULER.timer_tick(e);
+        SCHEDULER.timer_tick(e);
         self.tick();
 
         Ok(())

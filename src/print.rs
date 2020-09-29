@@ -41,7 +41,7 @@ macro_rules! info {
         #[allow(unused_imports)]
         //use crate::time::TimeManager;
 
-        let timestamp = $crate::time::time_manager().uptime();
+        let timestamp = $crate::bsp::generic_timer().current_time();
         let timestamp_subsec_us = timestamp.subsec_micros();
 
         $crate::print::_print(format_args_nl!(
@@ -55,7 +55,7 @@ macro_rules! info {
         #[allow(unused_imports)]
         //use crate::time::TimeManager;
 
-        let timestamp = $crate::time::time_manager().uptime();
+        let timestamp = $crate::bsp::generic_timer().current_time();
         let timestamp_subsec_us = timestamp.subsec_micros();
 
         $crate::print::_print(format_args_nl!(
@@ -89,7 +89,7 @@ macro_rules! warn {
         #[allow(unused_imports)]
         //use crate::time::TimeManager;
 
-        let timestamp = $crate::time::time_manager().uptime();
+        let timestamp = $crate::bsp::generic_timer().current_time();
         let timestamp_subsec_us = timestamp.subsec_micros();
 
         $crate::print::_print(format_args_nl!(

@@ -37,7 +37,6 @@ pub mod print;
 pub mod process;
 pub mod sched;
 pub mod syscall;
-pub mod time;
 
 extern crate alloc;
 
@@ -69,14 +68,10 @@ pub fn test_runner(tests: &[&test_types::UnitTest]) {
 #[cfg(test)]
 #[no_mangle]
 unsafe fn kernel_init() -> ! {
-    use linked_list_allocator::LockedHeap;
+    use memory::{heap_map, ALLOCATOR};
     extern crate alloc;
-    #[global_allocator]
-    static ALLOCATOR: LockedHeap = LockedHeap::empty();
-
-    ALLOCATOR
-        .lock()
-        .init(memory::map::virt::HEAP_START, memory::heap_size());
+    let (heap_start, heap_end) = heap_map().expect("failed to derive heap map");
+    ALLOCATOR.lock().init(heap_start, heap_end - heap_start);
     bsp::qemu_bring_up_console();
 
     test_main();

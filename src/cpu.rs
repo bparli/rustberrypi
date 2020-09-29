@@ -202,28 +202,23 @@ unsafe fn kmain2() -> ! {
 
     init_core_timer();
     exception::asynchronous::local_irq_unmask();
-    loop {
-        asm::wfi();
-    }
+    loop {}
 }
 
 fn init_core_timer() {
     use crate::warn;
     match core_id::<usize>() {
         1 => {
-            //CORE1_TIMER.init();
             if let Err(mssg) = CORE1_TIMER.register_and_enable_irq_handler() {
                 warn!("Error registering IRQ handler: {}", mssg);
             }
         }
         2 => {
-            //CORE2_TIMER.init();
             if let Err(mssg) = CORE2_TIMER.register_and_enable_irq_handler() {
                 warn!("Error registering IRQ handler: {}", mssg);
             }
         }
         3 => {
-            //CORE3_TIMER.init();
             if let Err(mssg) = CORE3_TIMER.register_and_enable_irq_handler() {
                 warn!("Error registering IRQ handler: {}", mssg);
             }

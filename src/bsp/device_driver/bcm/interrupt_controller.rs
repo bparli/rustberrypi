@@ -104,7 +104,6 @@ impl exception::asynchronous::interface::IRQManager for InterruptController {
         ic: &exception::asynchronous::IRQContext<'irq_context>,
         e: &mut exception::ExceptionContext,
     ) {
-        // It can only be a peripheral IRQ pending because enable() does not support local IRQs yet.
         if cpu::core_id::<usize>() == 0 {
             self.periph.handle_pending_irqs(ic, e);
         }

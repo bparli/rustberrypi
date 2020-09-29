@@ -33,7 +33,22 @@ impl GlobalScheduler {
             .lock()
             .as_mut()
             .expect("scheduler uninitialized")
-            .exit_task(ec)
+            .exit_task(ec);
+        // now find new trask to run on this core
+        loop {
+            {
+                if self
+                    .0
+                    .lock()
+                    .as_mut()
+                    .expect("scheduler uninitialized")
+                    .schedule(ec)
+                    > 0
+                {
+                    break;
+                }
+            }
+        }
     }
 
     /// Performs a context switch using `tf` by setting the state of the current
@@ -41,11 +56,32 @@ impl GlobalScheduler {
     /// restoring the next process's trap frame into `tf`. For more details, see
     /// the documentation on `Scheduler::switch()`.
     pub fn switch(&self, update_state: TaskState, ec: &mut exception::ExceptionContext) {
-        self.0
-            .lock()
-            .as_mut()
-            .expect("scheduler uninitialized")
-            .switch(update_state, ec)
+        let mut sched = false;
+        {
+            sched = self
+                .0
+                .lock()
+                .as_mut()
+                .expect("scheduler uninitialized")
+                .deschedule(update_state, ec);
+        }
+        // now find new trask to run on this core
+        if sched {
+            loop {
+                {
+                    if self
+                        .0
+                        .lock()
+                        .as_mut()
+                        .expect("scheduler uninitialized")
+                        .schedule(ec)
+                        > 0
+                    {
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     pub fn timer_tick(&self, e: &mut exception::ExceptionContext) {
@@ -55,7 +91,6 @@ impl GlobalScheduler {
 
 struct Scheduler {
     processes: VecDeque<Task>,
-    current: Option<u64>,
     last_id: Option<u64>,
 }
 
@@ -64,7 +99,6 @@ impl Scheduler {
     pub fn new() -> Scheduler {
         Scheduler {
             processes: VecDeque::new(),
-            current: None,
             last_id: None,
         }
     }
@@ -85,10 +119,6 @@ impl Scheduler {
         task.pid = task.context.tpidr;
         self.processes.push_back(task);
 
-        if let None = self.current {
-            self.current = Some(*id);
-        }
-
         Some(*id)
     }
 
@@ -100,40 +130,55 @@ impl Scheduler {
     ///
     /// This method blocks until there is a process to switch to, conserving
     /// energy as much as possible in the interim.
-    fn switch(&mut self, update_state: TaskState, ec: &mut exception::ExceptionContext) {
-        if self.current == Some(ec.tpidr) {
-            if let Some(running) = self.processes.front_mut() {
-                running.counter -= 1;
-                if running.counter <= 0 {
-                    let mut running = self.processes.pop_front().unwrap();
+    fn deschedule(
+        &mut self,
+        update_state: TaskState,
+        ec: &mut exception::ExceptionContext,
+    ) -> bool {
+        // find the task currently running on this core and
+        // decrement the counter on running task once its found
+
+        for (ind, tsk) in self.processes.iter_mut().enumerate() {
+            if tsk.pid == ec.tpidr {
+                tsk.counter -= 1;
+                match update_state {
+                    TaskState::READY => {
+                        if tsk.counter > 0 {
+                            return false;
+                        }
+                    }
+                    _ => {}
+                }
+                // times up, deschedule running task
+                if let Some(mut running) = self.processes.remove(ind) {
                     running.counter = 1;
                     running.state = update_state;
                     *running.context = *ec;
                     flush_tlb(&running.stack);
                     self.processes.push_back(running);
-                } else {
-                    return;
                 }
+                break;
             }
         }
+        return true;
+    }
 
-        loop {
-            let num_tasks = self.processes.len();
-            for _ in 0..num_tasks {
-                let mut new_task = self.processes.pop_front().unwrap();
-                if new_task.is_ready() {
-                    *ec = *new_task.context;
-                    new_task.state = TaskState::RUNNING;
-                    self.current = Some(ec.tpidr);
-                    self.processes.push_front(new_task);
-                    return;
-                } else {
-                    new_task.counter = (new_task.counter >> 1) + new_task.priority;
-                    self.processes.push_back(new_task);
-                }
+    fn schedule(&mut self, ec: &mut exception::ExceptionContext) -> u64 {
+        let num_tasks = self.processes.len();
+        for _ in 0..num_tasks {
+            let mut new_task = self.processes.pop_front().unwrap();
+            if new_task.is_ready() {
+                let pid = ec.tpidr;
+                *ec = *new_task.context;
+                new_task.state = TaskState::RUNNING;
+                self.processes.push_front(new_task);
+                return pid;
+            } else if new_task.is_waiting() {
+                new_task.counter = (new_task.counter >> 1) + new_task.priority;
             }
-            unsafe { asm!("wfi") }
+            self.processes.push_back(new_task);
         }
+        return 0;
     }
 
     fn exit_task(&mut self, ec: &mut exception::ExceptionContext) {
@@ -144,7 +189,7 @@ impl Scheduler {
                 break;
             }
         }
-        self.switch(TaskState::ZOMBIE, ec);
+        self.deschedule(TaskState::ZOMBIE, ec);
     }
 }
 

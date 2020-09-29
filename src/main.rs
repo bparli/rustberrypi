@@ -3,10 +3,8 @@
 #![no_std]
 
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-use cortex_a::asm;
-use libkernel::{bsp, cpu, driver, exception, info, memory, process, sched, syscall, time, warn};
+use libkernel::{bsp, cpu, driver, exception, info, memory, process, sched, syscall, warn};
 extern crate alloc;
-use core::time::Duration;
 use memory::ALLOCATOR;
 use sched::SCHEDULER;
 
@@ -82,7 +80,8 @@ fn kernel_main() -> ! {
 
     info!(
         "Architectural timer resolution: {} ns",
-        time::time_manager().resolution().as_nanos()
+        //time::time_manager().resolution().as_nanos()
+        CORE0_TIMER.resolution().as_nanos()
     );
 
     info!("Drivers loaded:");
@@ -121,30 +120,41 @@ fn kernel_main() -> ! {
         Rc::strong_count(&cloned_reference)
     );
 
-    process::add_user_process(process1);
-    process::add_user_process(process2);
+    for _ in 0..=5 {
+        process::add_user_process(process1);
+    }
     process::add_user_process(process4);
+    process::add_user_process(process2);
     process::add_kernel_process(process3);
     loop {}
 }
 
+static mut PROC_NUM: i32 = 1;
 fn process1() {
-    loop {
-        info!("forked proc numero uno");
-        syscall::sleep(2000);
+    unsafe {
+        let my_proc = PROC_NUM;
+        PROC_NUM += 1;
+        loop {
+            info!(
+                "forked proc numero uno {} {}",
+                cpu::core_id::<usize>(),
+                my_proc
+            );
+            syscall::sleep(3500);
+        }
     }
 }
 
 fn process4() {
     loop {
-        info!("forked proc numero uno");
-        time::time_manager().spin_for(Duration::from_secs(2));
+        info!("forked proc numero quatro {} ", cpu::core_id::<usize>());
+        syscall::sleep(2000);
     }
 }
 
 fn process2() {
-    for _num in 0..3 {
-        info!("forked proc dos");
+    for _ in 0..=5 {
+        info!("forked proc dos {} ", cpu::core_id::<usize>());
         syscall::sleep(2000);
     }
 
@@ -155,7 +165,6 @@ fn process2() {
 fn process3() {
     loop {
         info!("forked kernel proc {}", cpu::core_id::<usize>());
-        asm::sev();
-        time::time_manager().spin_for(Duration::from_secs(2));
+        cpu::spin_for_cycles(2000000000)
     }
 }

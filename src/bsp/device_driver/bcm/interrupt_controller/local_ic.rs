@@ -1,6 +1,5 @@
 use super::{InterruptController, LocalIRQ, PendingIRQs};
 use crate::{bsp::device_driver::common::MMIODerefWrapper, cpu, exception};
-use cortex_a::regs::*;
 use register::{mmio::*, register_structs};
 
 // BCM2837 Local Peripheral Registers (QA7: Chapter 4)
@@ -72,7 +71,7 @@ impl exception::asynchronous::interface::IRQManager for LocalIC {
         let irq_number = irq.get();
         let mut handler_tables = self.handler_tables.write();
 
-        if handler_tables[cpu::core_id::<usize>()][irq_number].is_some() {
+        if handler_tables[0][irq_number].is_some() {
             return Err("IRQ handler already registered");
         }
         handler_tables[cpu::core_id::<usize>()][irq_number] = Some(descriptor);
@@ -91,8 +90,8 @@ impl exception::asynchronous::interface::IRQManager for LocalIC {
         _ic: &exception::asynchronous::IRQContext<'irq_context>,
         e: &mut exception::ExceptionContext,
     ) {
+        let handler_tables = self.handler_tables.read();
         for irq_number in self.get_pending() {
-            let handler_tables = self.handler_tables.read();
             let core_handler_table = handler_tables[cpu::core_id::<usize>()];
             match core_handler_table[irq_number] {
                 None => panic!(
