@@ -1,3 +1,4 @@
+// Borrowed from https://github.com/sslab-gatech/cs3210-rustos-public/blob/lab5/kern/src/net.rs
 pub mod uspi;
 
 use alloc::boxed::Box;

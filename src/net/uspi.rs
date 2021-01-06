@@ -1,3 +1,4 @@
+// borrowed from https://github.com/sslab-gatech/cs3210-rustos-public/blob/lab5/kern/src/net/uspi.rs
 #![allow(non_snake_case)]
 
 use alloc::boxed::Box;
@@ -25,7 +26,7 @@ static TIMER3_DRIVER: USBHandler = USBHandler::uninitialized();
 struct Param(*mut c_void);
 
 mod inner {
-    use crate::{cpu, info, warn};
+    use crate::{cpu, info};
     use core::convert::TryInto;
     use core::ptr;
     use core::time::Duration;
