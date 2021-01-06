@@ -5,6 +5,7 @@ pub mod irq_map {
 
     pub const PL011_UART: IRQNumber = IRQNumber::Peripheral(PeripheralIRQ::new(57));
     pub const SYSTEM_TIMER: IRQNumber = IRQNumber::Peripheral(PeripheralIRQ::new(1));
+    pub const USB: IRQNumber = IRQNumber::Peripheral(PeripheralIRQ::new(2));
     pub const LOCAL_TIMER: IRQNumber = IRQNumber::Local(LocalIRQ::new(1));
 }
 

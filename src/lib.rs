@@ -14,6 +14,7 @@
 #![no_std]
 #![feature(ptr_internals)]
 #![feature(llvm_asm)]
+#![feature(negative_impls)]
 // Testing
 #![cfg_attr(test, no_main)]
 #![feature(custom_test_frameworks)]
@@ -33,6 +34,7 @@ pub mod cpu;
 pub mod driver;
 pub mod exception;
 pub mod memory;
+pub mod net;
 pub mod print;
 pub mod process;
 pub mod sched;

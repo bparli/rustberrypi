@@ -101,6 +101,11 @@ unsafe fn el2_to_el1() {
         // Set EL1 execution state to AArch64.
         HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64);
 
+        // can't use softfloat anymore since we're using uspi
+        // enable floating point and SVE (SIMD) (A53: 4.3.38, 4.3.34)
+        runtime_init::CPTR_EL2.set(0);
+        runtime_init::CPACR_EL1.set(runtime_init::CPACR_EL1.get() | (0b11 << 20));
+
         // Set SCTLR to known state
         runtime_init::SCTLR_EL1.set(runtime_init::SCTLR_EL1::RES1);
 

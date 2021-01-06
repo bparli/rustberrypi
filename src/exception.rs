@@ -10,7 +10,7 @@ pub enum PrivilegeLevel {
     Unknown,
 }
 
-use crate::{bsp, exception, syscall};
+use crate::{bsp, exception, info, syscall};
 use core::fmt;
 use cortex_a::regs::*;
 
@@ -94,7 +94,7 @@ unsafe extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 #[no_mangle]
 unsafe extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
     use exception::asynchronous::interface::IRQManager;
-    //info!("Exception current_elx_irq for proc {:?}", e.tpidr);
+    info!("Exception current_elx_irq for proc {:?}", e.tpidr);
 
     let token = &exception::asynchronous::IRQContext::new();
     bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);

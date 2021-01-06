@@ -3,9 +3,10 @@
 #![no_std]
 
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-use libkernel::{bsp, cpu, driver, exception, info, memory, process, sched, syscall, warn};
+use libkernel::{bsp, cpu, driver, exception, info, memory, net, process, sched, syscall, warn};
 extern crate alloc;
 use memory::ALLOCATOR;
+use net::{ETH, USB};
 use sched::SCHEDULER;
 
 static CORE0_TIMER: bsp::device_driver::LocalTimer = unsafe {
@@ -56,6 +57,12 @@ unsafe fn kernel_init() -> ! {
 
     // Unmask interrupts on the boot CPU core.
     exception::asynchronous::local_irq_unmask();
+
+    if USB.initialize() {
+        ETH.initialize();
+    } else {
+        info!("Unable to initialize Ethernet controller; skipping");
+    }
 
     SCHEDULER.init();
 
