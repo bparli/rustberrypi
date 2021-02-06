@@ -22,7 +22,7 @@ impl Atag {
         let current_ptr = self as *const Atag as *const u32;
         match self.dwords {
             0 => None,
-            size => {
+            _ => {
                 let next_atag = unsafe { &*(current_ptr.add(self.dwords as usize) as *const Atag) };
                 Some(next_atag)
             }

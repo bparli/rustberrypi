@@ -5,7 +5,6 @@
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
 use libkernel::{bsp, cpu, driver, exception, info, memory, net, process, sched, syscall, warn};
 extern crate alloc;
-use core::time::Duration;
 use memory::ALLOCATOR;
 use net::{ETH, USB};
 use sched::SCHEDULER;

@@ -10,7 +10,7 @@ pub enum PrivilegeLevel {
     Unknown,
 }
 
-use crate::{bsp, exception, info, syscall};
+use crate::{bsp, exception, syscall};
 use core::fmt;
 use cortex_a::regs::*;
 

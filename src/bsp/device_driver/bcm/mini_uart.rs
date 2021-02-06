@@ -1,10 +1,10 @@
-use cortex_a::asm;
-use crate::{bsp, console, cpu, driver, exception};
-use core::{fmt, ops};
-use register::{mmio::*, register_bitfields, register_structs};
-use spin;
-pub use asm::nop;
 use crate::bsp::device_driver::GPIO;
+use crate::{bsp, console, driver};
+pub use asm::nop;
+use core::{fmt, ops};
+use cortex_a::asm;
+use register::{mmio::*, register_bitfields};
+use spin;
 
 // Auxilary mini UART registers
 //
@@ -101,7 +101,7 @@ pub struct RegisterBlock {
 }
 
 pub struct MiniUart {
-    inner: spin::Mutex<MiniUartInner>
+    inner: spin::Mutex<MiniUartInner>,
 }
 
 impl MiniUart {
@@ -115,7 +115,7 @@ impl MiniUart {
     }
 
     pub fn init(&self, gpio: &GPIO) {
-        let mut data = self.inner.lock();
+        let data = self.inner.lock();
         data.init(gpio);
     }
 }
@@ -240,7 +240,6 @@ impl fmt::Write for MiniUartInner {
         for c in s.chars() {
             self.write_char(c);
         }
-        
         Ok(())
     }
 }
@@ -249,7 +248,7 @@ impl console::interface::Write for MiniUart {
     /// Passthrough of `args` to the `core::fmt::Write` implementation, but guarded by a Mutex to
     /// serialize access.
     fn write_char(&self, c: char) {
-        let mut data = self.inner.lock();
+        let data = self.inner.lock();
         data.write_char(c);
     }
 
@@ -261,26 +260,26 @@ impl console::interface::Write for MiniUart {
     }
 
     fn flush(&self) {
-        let mut data = self.inner.lock();
+        let data = self.inner.lock();
         data.wait_tx_fifo_empty();
     }
 }
 
 impl console::interface::Read for MiniUart {
     fn read_char(&self) -> char {
-        let mut data = self.inner.lock();
+        let data = self.inner.lock();
         data.read_char()
     }
 
     fn clear(&self) {
-        let mut data = self.inner.lock();
+        let data = self.inner.lock();
         data.clear()
     }
 }
 
 impl console::interface::Statistics for MiniUart {
     fn chars_written(&self) -> usize {
-       0
+        0
     }
 
     fn chars_read(&self) -> usize {
@@ -294,7 +293,7 @@ impl driver::interface::DeviceDriver for MiniUart {
     }
 
     fn init(&self) -> Result<(), ()> {
-        let mut data = self.inner.lock();
+        let data = self.inner.lock();
         data.init(&bsp::GPIO);
 
         Ok(())
