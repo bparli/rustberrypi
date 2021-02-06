@@ -8,7 +8,7 @@ DEV_SERIAL ?= /dev/ttyUSB0
 UNAME_S = $(shell uname -s)
 
 # BSP-specific arguments
-TARGET            = aarch64-unknown-none
+TARGET            = aarch64-unknown-none-softfloat
 KERNEL_BIN        = kernel8.img
 QEMU_BINARY       = qemu-system-aarch64
 QEMU_MACHINE_TYPE = raspi3
@@ -32,7 +32,7 @@ endif
 QEMU_MISSING_STRING = "This board is not yet supported for QEMU."
 
 RUSTFLAGS          = -C link-arg=-T$(LINKER_FILE) $(RUSTC_MISC_ARGS)
-RUSTFLAGS_ETH      = $(RUSTFLAGS) -C link-arg=-L.cargo -C link-arg=-luspi -C link-arg=-luspienv
+RUSTFLAGS_ETH      = $(RUSTFLAGS) -C link-arg=-L.cargo -C link-arg=-luspi
 RUSTFLAGS_PEDANTIC = $(RUSTFLAGS) -D warnings
 
 FEATURES      = bsp_$(BSP)
@@ -80,10 +80,10 @@ EXEC_MINIPUSH = ruby ./utils/minipush.rb
 all: $(KERNEL_BIN)
 
 uspi:
-	@(cd ext/uspi/lib; make)
+	@(cd ext/uspi/lib; make clean && make)
 	cp -f ext/uspi/lib/libuspi.a ./.cargo
-	@(cd ext/uspi/env/lib; make)
-	cp -f ext/uspi/env/lib/libuspienv.a ./.cargo
+	# @(cd ext/uspi/env/lib; make clean && make)
+	# cp -f ext/uspi/env/lib/libuspienv.a ./.cargo
 
 $(KERNEL_ELF):
 	RUSTFLAGS="$(RUSTFLAGS_ETH)" $(RUSTC_CMD)

@@ -5,6 +5,7 @@
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
 use libkernel::{bsp, cpu, driver, exception, info, memory, net, process, sched, syscall, warn};
 extern crate alloc;
+use core::time::Duration;
 use memory::ALLOCATOR;
 use net::{ETH, USB};
 use sched::SCHEDULER;
@@ -24,19 +25,29 @@ unsafe fn kernel_init() -> ! {
     }
 
     // finally working
-    cpu::wake_up_secondary_cores();
-
+    //cpu::wake_up_secondary_cores();
     // enable the core's mmu
     memory::mmu::core_setup();
 
+    // init all the drivers
     for i in bsp::driver::driver_manager().all_device_drivers().iter() {
         if i.init().is_err() {
             panic!("Error loading driver: {}", i.compatible())
         }
     }
 
-    bsp::driver::driver_manager().post_device_driver_init();
-    //println! is usable from here on.
+    ALLOCATOR.lock().init(
+        memory::heap_start(),
+        memory::heap_end() - memory::heap_start(),
+    );
+
+    let mut mbox = crate::bsp::device_driver::MBox::new().unwrap();
+    let serial = mbox.serial_number().expect("Could not get serial number");
+    let mac = mbox.mac_address().expect("Could not get MAC");
+    info!(
+        "Board serial number is {} and mac address is {}",
+        serial, mac
+    );
 
     //Let device drivers register and enable their handlers with the interrupt controller.
     for i in bsp::driver::driver_manager().all_device_drivers() {
@@ -48,23 +59,20 @@ unsafe fn kernel_init() -> ! {
     let (_, privilege_level) = exception::current_privilege_level();
     info!("Current privilege level: {}", privilege_level);
 
-    if let Err(mssg) = CORE0_TIMER.register_and_enable_irq_handler() {
-        warn!("Error registering IRQ handler: {}", mssg);
-    }
-
-    let (heap_start, heap_end) = memory::heap_map().expect("failed to derive heap map");
-    ALLOCATOR.lock().init(heap_start, heap_end - heap_start);
-
-    // Unmask interrupts on the boot CPU core.
     exception::asynchronous::local_irq_unmask();
 
     if USB.initialize() {
+        info!("Powered on USB hub");
         ETH.initialize();
     } else {
         info!("Unable to initialize Ethernet controller; skipping");
     }
 
     SCHEDULER.init();
+
+    // if let Err(mssg) = CORE0_TIMER.register_and_enable_irq_handler() {
+    //     warn!("Error registering IRQ handler: {}", mssg);
+    // }
 
     kernel_main()
 }

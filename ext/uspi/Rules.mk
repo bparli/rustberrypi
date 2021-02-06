@@ -41,13 +41,13 @@ AR	= $(PREFIX)ar
 
 ifeq ($(strip $(AARCH64)),0)
 ifeq ($(strip $(RASPPI)),1)
-ARCH	?= -march=armv6j -mtune=arm1176jzf-s -mfloat-abi=hard 
+ARCH	?= -march=armv6j -mtune=arm1176jzf-s
 TARGET	?= kernel
 else ifeq ($(strip $(RASPPI)),2)
-ARCH	?= -march=armv7-a -mtune=cortex-a7 -mfloat-abi=hard
+ARCH	?= -march=armv7-a -mtune=cortex-a7
 TARGET	?= kernel7
 else
-ARCH	?= -march=armv8-a -mtune=cortex-a53 -mfloat-abi=hard
+ARCH	?= -march=armv8-a -mtune=cortex-a53
 TARGET	?= kernel8-32
 endif
 else

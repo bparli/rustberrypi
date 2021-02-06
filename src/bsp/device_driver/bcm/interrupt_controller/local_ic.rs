@@ -94,10 +94,17 @@ impl exception::asynchronous::interface::IRQManager for LocalIC {
         for irq_number in self.get_pending() {
             let core_handler_table = handler_tables[cpu::core_id::<usize>()];
             match core_handler_table[irq_number] {
-                None => panic!(
-                    "Local Interrupt Controller: No handler registered for IRQ {}",
-                    irq_number
-                ),
+                None => {
+                    // check if from gpu first
+                    if irq_number == 8 {
+                        crate::info!("Local Interrupt Controller: IRQ 8 fired");
+                    } else {
+                        panic!(
+                            "Local Interrupt Controller: No handler registered for IRQ {}",
+                            irq_number
+                        )
+                    }
+                }
                 Some(descriptor) => {
                     // Call the IRQ handler. Panics on failure.
                     descriptor.handler.handle(e).expect("Error handling IRQ");

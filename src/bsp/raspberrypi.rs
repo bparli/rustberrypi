@@ -16,6 +16,12 @@ static PL011_UART: device_driver::PL011Uart = unsafe {
     )
 };
 
+pub static MINI_UART: device_driver::MiniUart = unsafe {
+    device_driver::MiniUart::new(
+        memory::map::mmio::MINI_UART_BASE,
+    )
+};
+
 pub static SYSTEM_TIMER: device_driver::SystemTimer = unsafe {
     device_driver::SystemTimer::new(
         memory::map::mmio::SYS_TIMER_BASE,

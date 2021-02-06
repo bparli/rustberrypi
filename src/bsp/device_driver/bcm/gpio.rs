@@ -1,6 +1,7 @@
 use crate::{bsp::device_driver::common::MMIODerefWrapper, cpu, driver};
 use register::{mmio::*, register_bitfields, register_structs};
 use spin;
+pub use cortex_a::asm::nop;
 
 // GPIO registers.
 //
@@ -15,7 +16,8 @@ register_bitfields! {
         FSEL15 OFFSET(15) NUMBITS(3) [
             Input = 0b000,
             Output = 0b001,
-            AltFunc0 = 0b100  // PL011 UART RX
+            AltFunc0 = 0b100,  // PL011 UART RX
+            AltFunc1 = 0b010  // Mini UART - Alternate function 5
 
         ],
 
@@ -23,7 +25,8 @@ register_bitfields! {
         FSEL14 OFFSET(12) NUMBITS(3) [
             Input = 0b000,
             Output = 0b001,
-            AltFunc0 = 0b100  // PL011 UART TX
+            AltFunc0 = 0b100,  // PL011 UART TX
+            AltFunc1 = 0b010  // Mini UART - Alternate function 5
         ]
     ],
 
@@ -93,6 +96,23 @@ impl GPIO {
 
         // Enable pins 14 and 15.
         data.GPPUD.set(0);
+        cpu::spin_for_cycles(150);
+
+        data.GPPUDCLK0
+            .write(GPPUDCLK0::PUDCLK14::AssertClock + GPPUDCLK0::PUDCLK15::AssertClock);
+        cpu::spin_for_cycles(150);
+
+        data.GPPUDCLK0.set(0);
+    }
+
+    pub fn map_mini_uart(&self) {
+        let data = &self.inner.lock();
+
+        // map UART1 to GPIO pins
+        data.GPFSEL1
+            .modify(GPFSEL1::FSEL14::AltFunc1 + GPFSEL1::FSEL15::AltFunc1);
+
+        data.GPPUD.set(0); // enable pins 14 and 15
         cpu::spin_for_cycles(150);
 
         data.GPPUDCLK0

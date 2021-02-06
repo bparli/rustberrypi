@@ -32,6 +32,7 @@ pub enum Translation {
 #[derive(Copy, Clone)]
 pub enum MemAttributes {
     CacheableDRAM,
+    NonCacheableDRAM,
     Device,
 }
 
@@ -109,6 +110,7 @@ impl fmt::Display for RangeDescriptor {
 
         let attr = match self.attribute_fields.mem_attributes {
             MemAttributes::CacheableDRAM => "C",
+            MemAttributes::NonCacheableDRAM => "NC",
             MemAttributes::Device => "Dev",
         };
 
@@ -302,6 +304,7 @@ trait BaseAddr {
 mod mair {
     pub const DEVICE: u64 = 0;
     pub const NORMAL: u64 = 1;
+    pub const NORMAL_NON_CACHEABLE: u64 = 2;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -353,6 +356,10 @@ impl convert::From<AttributeFields>
             MemAttributes::CacheableDRAM => {
                 STAGE1_PAGE_DESCRIPTOR::SH::InnerShareable
                     + STAGE1_PAGE_DESCRIPTOR::AttrIndx.val(mair::NORMAL)
+            }
+            MemAttributes::NonCacheableDRAM => {
+                STAGE1_PAGE_DESCRIPTOR::SH::InnerShareable
+                    + STAGE1_PAGE_DESCRIPTOR::AttrIndx.val(mair::NORMAL_NON_CACHEABLE)
             }
             MemAttributes::Device => {
                 STAGE1_PAGE_DESCRIPTOR::SH::OuterShareable

@@ -9,6 +9,7 @@ static BSP_DRIVER_MANAGER: BSPDriverManager = BSPDriverManager {
     device_drivers: [
         &super::GPIO,
         &super::PL011_UART,
+        //&super::MINI_UART,
         &super::INTERRUPT_CONTROLLER,
         &super::SYSTEM_TIMER,
     ],
@@ -28,6 +29,6 @@ impl driver::interface::DriverManager for BSPDriverManager {
 
     fn post_device_driver_init(&self) {
         // Configure PL011Uart's output pins.
-        super::GPIO.map_pl011_uart();
+       super::GPIO.map_pl011_uart();
     }
 }

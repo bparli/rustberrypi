@@ -44,7 +44,7 @@ register_structs! {
 }
 
 pub struct SystemTimer {
-    inner: spin::Mutex<SystemTimerInner>,
+    inner: spin::RwLock<SystemTimerInner>,
     irq_number: bsp::device_driver::IRQNumber,
 }
 
@@ -91,7 +91,7 @@ impl SystemTimerInner {
 impl SystemTimer {
     pub const unsafe fn new(base_addr: usize, irq_number: bsp::device_driver::IRQNumber) -> Self {
         Self {
-            inner: spin::Mutex::new(SystemTimerInner::new(base_addr)),
+            inner: spin::RwLock::new(SystemTimerInner::new(base_addr)),
             irq_number: irq_number,
         }
     }
@@ -103,7 +103,7 @@ impl driver::interface::DeviceDriver for SystemTimer {
     }
 
     fn init(&self) -> Result<(), ()> {
-        let mut data = self.inner.lock();
+        let mut data = self.inner.write();
         data.init();
 
         Ok(())
@@ -127,7 +127,7 @@ impl driver::interface::DeviceDriver for SystemTimer {
 
 impl exception::asynchronous::interface::IRQHandler for SystemTimer {
     fn handle(&self, _e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
-        let mut data = self.inner.lock();
+        let mut data = self.inner.write();
         data.handle();
 
         //crate::sched::SCHEDULER.timer_tick(_e);
@@ -153,6 +153,14 @@ impl GenericSystemTimer {
         let low = self.CLO.get();
         let high = self.CHI.get();
         Duration::from_micros(((high as u64) << 32) | low as u64)
+    }
+
+    /// Spins until `t` duration have passed.
+    pub fn spin_sleep(&self, t: Duration) {
+        let end_time = self.current_time() + t;
+        while end_time > self.current_time() {
+            continue;
+        }
     }
 }
 
