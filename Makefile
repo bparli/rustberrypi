@@ -32,7 +32,7 @@ endif
 QEMU_MISSING_STRING = "This board is not yet supported for QEMU."
 
 RUSTFLAGS          = -C link-arg=-T$(LINKER_FILE) $(RUSTC_MISC_ARGS)
-RUSTFLAGS_ETH      = $(RUSTFLAGS) -C link-arg=-L.cargo -C link-arg=-luspi
+RUSTFLAGS_ETH      = $(RUSTFLAGS) -C link-arg=-L.cargo -C link-arg=-luspi -C link-arg=-luspienv
 RUSTFLAGS_PEDANTIC = $(RUSTFLAGS) -D warnings
 
 FEATURES      = bsp_$(BSP)
@@ -82,8 +82,8 @@ all: $(KERNEL_BIN)
 uspi:
 	@(cd ext/uspi/lib; make clean && make)
 	cp -f ext/uspi/lib/libuspi.a ./.cargo
-	# @(cd ext/uspi/env/lib; make clean && make)
-	# cp -f ext/uspi/env/lib/libuspienv.a ./.cargo
+	@(cd ext/uspi/env/lib; make clean && make)
+	cp -f ext/uspi/env/lib/libuspienv.a ./.cargo
 
 $(KERNEL_ELF):
 	RUSTFLAGS="$(RUSTFLAGS_ETH)" $(RUSTC_CMD)

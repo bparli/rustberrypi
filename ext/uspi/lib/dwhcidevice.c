@@ -291,6 +291,7 @@ boolean DWHCIDeviceSubmitBlockingRequest(TDWHCIDevice *pThis, TUSBRequest *pURB)
 	DataMemBarrier();
 
 	assert(pURB != 0);
+
 	USBRequestSetStatus(pURB, 0);
 
 	if (USBEndpointGetType(USBRequestGetEndpoint(pURB)) == EndpointTypeControl)
@@ -301,7 +302,6 @@ boolean DWHCIDeviceSubmitBlockingRequest(TDWHCIDevice *pThis, TUSBRequest *pURB)
 		if (pSetup->bmRequestType & REQUEST_IN)
 		{
 			assert(USBRequestGetBufLen(pURB) > 0);
-
 			if (!DWHCIDeviceTransferStage(pThis, pURB, FALSE, FALSE) || !DWHCIDeviceTransferStage(pThis, pURB, TRUE, FALSE) || !DWHCIDeviceTransferStage(pThis, pURB, FALSE, TRUE))
 			{
 				return FALSE;
@@ -725,6 +725,7 @@ boolean DWHCIDeviceTransferStage(TDWHCIDevice *pThis, TUSBRequest *pURB, boolean
 	{
 		// do nothing
 	}
+
 	return USBRequestGetStatus(pURB);
 }
 

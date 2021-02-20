@@ -2,7 +2,7 @@ use crate::driver;
 
 /// Device Driver Manager type.
 pub struct BSPDriverManager {
-    device_drivers: [&'static (dyn DeviceDriver + Sync); 4],
+    device_drivers: [&'static (dyn DeviceDriver + Sync); 3],
 }
 
 static BSP_DRIVER_MANAGER: BSPDriverManager = BSPDriverManager {
@@ -11,7 +11,7 @@ static BSP_DRIVER_MANAGER: BSPDriverManager = BSPDriverManager {
         &super::PL011_UART,
         //&super::MINI_UART,
         &super::INTERRUPT_CONTROLLER,
-        &super::SYSTEM_TIMER,
+        //&super::SYSTEM_TIMER,
     ],
 };
 
@@ -29,6 +29,6 @@ impl driver::interface::DriverManager for BSPDriverManager {
 
     fn post_device_driver_init(&self) {
         // Configure PL011Uart's output pins.
-       super::GPIO.map_pl011_uart();
+        super::GPIO.map_pl011_uart();
     }
 }

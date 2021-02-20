@@ -99,6 +99,28 @@ impl exception::asynchronous::interface::IRQManager for InterruptController {
         }
     }
 
+    fn enable_fiq(&self, irq: Self::IRQNumberType) {
+        match irq {
+            IRQNumber::Peripheral(pirq) => self.periph.enable_fiq(pirq),
+            _ => crate::warn!("Enabling local FIQ interrupts not supported"),
+        }
+    }
+
+    fn register_fiq(&self, descriptor: exception::asynchronous::IRQDescriptor) {
+        self.periph.register_fiq(descriptor)
+    }
+
+    fn handle_fiq(&self, e: &mut exception::ExceptionContext) {
+        self.periph.handle_fiq(e)
+    }
+
+    fn disable(&self, irq: Self::IRQNumberType) {
+        match irq {
+            IRQNumber::Peripheral(pirq) => self.periph.disable(pirq),
+            _ => crate::warn!("Disabling local interrupts not supported"),
+        }
+    }
+
     fn handle_pending_irqs<'irq_context>(
         &'irq_context self,
         ic: &exception::asynchronous::IRQContext<'irq_context>,

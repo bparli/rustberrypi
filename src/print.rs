@@ -73,9 +73,8 @@ macro_rules! info {
 macro_rules! warn {
     ($string:expr) => ({
         #[allow(unused_imports)]
-        //use crate::time::TimeManager;
 
-        let timestamp = $crate::time::time_manager().uptime();
+        let timestamp = $crate::bsp::generic_timer().current_time();
         let timestamp_subsec_us = timestamp.subsec_micros();
 
         $crate::print::_print(format_args_nl!(

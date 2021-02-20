@@ -78,6 +78,14 @@ unsafe extern "C" fn current_el0_irq(e: &mut ExceptionContext) {
 }
 
 #[no_mangle]
+unsafe extern "C" fn current_el0_fiq(e: &mut ExceptionContext) {
+    //crate::info!("Exception current_el0_fiq for proc {:?}", e.tpidr);
+    use exception::asynchronous::interface::IRQManager;
+    let token = &exception::asynchronous::IRQContext::new();
+    bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
+}
+
+#[no_mangle]
 unsafe extern "C" fn current_el0_serror(e: &mut ExceptionContext) {
     default_exception_handler(e);
 }
@@ -96,6 +104,13 @@ unsafe extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
     use exception::asynchronous::interface::IRQManager;
     let token = &exception::asynchronous::IRQContext::new();
     bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
+}
+
+#[no_mangle]
+unsafe extern "C" fn current_elx_fiq(e: &mut ExceptionContext) {
+    //crate::info!("Exception current_elx_fiq for proc {:?}", e.tpidr);
+    use exception::asynchronous::interface::IRQManager;
+    bsp::exception::asynchronous::irq_manager().handle_fiq(e);
 }
 
 #[no_mangle]
@@ -118,6 +133,11 @@ unsafe extern "C" fn lower_aarch64_irq(e: &mut ExceptionContext) {
 }
 
 #[no_mangle]
+unsafe extern "C" fn lower_aarch64_fiq(e: &mut ExceptionContext) {
+    default_exception_handler(e);
+}
+
+#[no_mangle]
 unsafe extern "C" fn lower_aarch64_serror(e: &mut ExceptionContext) {
     default_exception_handler(e);
 }
@@ -133,6 +153,11 @@ unsafe extern "C" fn lower_aarch32_synchronous(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn lower_aarch32_irq(e: &mut ExceptionContext) {
+    default_exception_handler(e);
+}
+
+#[no_mangle]
+unsafe extern "C" fn lower_aarch32_fiq(e: &mut ExceptionContext) {
     default_exception_handler(e);
 }
 

@@ -66,7 +66,7 @@ impl SystemTimerInner {
     pub const unsafe fn new(base_addr: usize) -> Self {
         Self {
             base_addr,
-            interval: 200000,
+            interval: 1000,
             cur_val: 0,
         }
     }
@@ -86,6 +86,20 @@ impl SystemTimerInner {
         self.C1.set(self.cur_val);
         self.CS.write(CS::M1::Match);
     }
+
+    fn tick_in(&mut self, t: Duration) {
+        let current = self.CLO.get();
+        let target = current.wrapping_add(t.as_micros() as u32);
+
+        self.C1.set(target);
+        self.CS.write(CS::M1::Match);
+    }
+
+    fn current_time(&self) -> Duration {
+        let low = self.CLO.get();
+        let high = self.CHI.get();
+        Duration::from_micros(((high as u64) << 32) | low as u64)
+    }
 }
 
 impl SystemTimer {
@@ -94,6 +108,14 @@ impl SystemTimer {
             inner: spin::RwLock::new(SystemTimerInner::new(base_addr)),
             irq_number: irq_number,
         }
+    }
+
+    fn current_time(&self) -> Duration {
+        self.inner.read().current_time()
+    }
+
+    fn tick_in(&self, t: Duration) {
+        self.inner.write().tick_in(t)
     }
 }
 
@@ -127,11 +149,6 @@ impl driver::interface::DeviceDriver for SystemTimer {
 
 impl exception::asynchronous::interface::IRQHandler for SystemTimer {
     fn handle(&self, _e: &mut exception::ExceptionContext) -> Result<(), &'static str> {
-        let mut data = self.inner.write();
-        data.handle();
-
-        //crate::sched::SCHEDULER.timer_tick(_e);
-
         Ok(())
     }
 }

@@ -85,6 +85,12 @@ impl exception::asynchronous::interface::IRQManager for LocalIC {
         self.registers.core_timer_interrupt_control[cpu::core_id::<usize>()].set(enable_bit);
     }
 
+    // keep the trait happy
+    fn enable_fiq(&self, _irq: Self::IRQNumberType) {}
+    fn disable(&self, _irq: Self::IRQNumberType) {}
+    fn register_fiq(&self, _descriptor: exception::asynchronous::IRQDescriptor) {}
+    fn handle_fiq(&self, _e: &mut exception::ExceptionContext) {}
+
     fn handle_pending_irqs<'irq_context>(
         &'irq_context self,
         _ic: &exception::asynchronous::IRQContext<'irq_context>,

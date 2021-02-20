@@ -1,7 +1,6 @@
 // borrowed from https://github.com/sslab-gatech/cs3210-rustos-public/blob/lab5/kern/src/net/uspi.rs
 #![allow(non_snake_case)]
 
-use alloc::boxed::Box;
 use alloc::string::String;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ffi::c_void;
@@ -19,9 +18,8 @@ use crate::net::Frame;
 use spin;
 
 pub type TKernelTimerHandle = u64;
-pub type TKernelTimerHandler = Option<
-    unsafe extern "C" fn(hTimer: TKernelTimerHandle, pParam: *mut c_void, pContext: *mut c_void),
->;
+pub type TKernelTimerHandler =
+    Option<unsafe extern "C" fn(hTimer: TKernelTimerHandle, pParam: *mut u8, pContext: *mut u8)>;
 pub type TInterruptHandler = Option<unsafe extern "C" fn(pParam: *mut u8)>;
 
 static mut USB_DRIVER: USBHandler = USBHandler::uninitialized();
@@ -33,6 +31,10 @@ unsafe impl Sync for Param {}
 mod inner {
     use crate::net::Frame;
     pub struct USPi(());
+    use super::{TKernelTimerHandle, TKernelTimerHandler};
+    use core::convert::TryInto;
+    use core::ptr;
+    use core::time::Duration;
 
     extern "C" {
         /// Returns 0 on failure
@@ -48,6 +50,14 @@ mod inner {
         /// pBuffer must have size USPI_FRAME_BUFFER_SIZE
         /// Returns 0 if no frame is available or on failure
         fn USPiReceiveFrame(pBuffer: *mut u8, pResultLength: *mut u32) -> i32;
+        fn TimerStartKernelTimer(
+            pThis: TKernelTimerHandle,
+            nDelay: usize, // in HZ units
+            pHandler: TKernelTimerHandler,
+            pParam: *mut u8,
+            pContext: *mut u8,
+        ) -> usize;
+        fn TimerGet() -> TKernelTimerHandle;
     }
 
     impl !Sync for USPi {}
@@ -88,14 +98,31 @@ mod inner {
         }
 
         /// Receives an ethernet frame using USPiRecvFrame
-        pub fn recv_frame<'a>(&mut self, frame: &mut Frame) -> Option<i32> {
+        pub fn recv_frame(&mut self, frame: &mut Frame) -> Option<i32> {
             let mut result_len = 0;
-            //info!("Recv frame {:?}", frame);
             let result = unsafe { USPiReceiveFrame(frame.as_mut_ptr(), &mut result_len) };
             frame.set_len(result_len);
             match result {
                 0 => None,
                 n => Some(n),
+            }
+        }
+
+        /// A wrapper function to `TimerStartKernelHandler`.
+        pub fn start_kernel_timer(&mut self, delay: Duration, handler: TKernelTimerHandler) {
+            let divisor = (1000 / 10) as u128;
+            let delay_as_hz = (delay.as_millis() + divisor - 1) / divisor;
+
+            if let Ok(c_delay) = delay_as_hz.try_into() {
+                unsafe {
+                    TimerStartKernelTimer(
+                        TimerGet(),
+                        c_delay,
+                        handler,
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                    );
+                }
             }
         }
     }
@@ -108,17 +135,17 @@ unsafe fn layout(size: usize) -> Layout {
 }
 
 #[no_mangle]
-fn malloc(size: u32) -> *mut c_void {
+fn malloc(size: u32) -> *mut u8 {
     let layout = unsafe { layout(size as usize) };
     let kernel_ptr = unsafe { ALLOCATOR.alloc(layout) };
     let ptr = unsafe { kernel_ptr.offset(core::mem::size_of::<usize>() as isize) };
     let ptr_size_ptr = kernel_ptr as *mut usize;
     unsafe { *ptr_size_ptr = size as usize };
-    ptr as *mut c_void
+    ptr as *mut u8
 }
 
 #[no_mangle]
-fn free(ptr: *mut c_void) {
+fn free(ptr: *mut u8) {
     let kernel_ptr = unsafe { ptr.offset(0 - (core::mem::size_of::<usize>() as isize)) };
     let ptr_size_ptr = kernel_ptr as *mut usize;
     let layout = unsafe { layout(*ptr_size_ptr) };
@@ -161,12 +188,13 @@ pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *
                 name: "USB",
                 handler: &USB_DRIVER,
             };
-            irq_manager().register_handler(usb, descriptor).unwrap();
-            irq_manager().enable(usb);
+            //irq_manager().register_handler(usb, descriptor).unwrap();
+            irq_manager().register_fiq(descriptor);
+            irq_manager().enable_fiq(usb);
         }
-        1 => {
+        3 => {
             TIMER3_DRIVER.initialize(pHandler, pParam);
-            pub const timer: IRQNumber = IRQNumber::Peripheral(PeripheralIRQ::new(1));
+            pub const timer: IRQNumber = IRQNumber::Peripheral(PeripheralIRQ::new(3));
             let descriptor = IRQDescriptor {
                 name: "Timer3",
                 handler: &TIMER3_DRIVER,
@@ -174,54 +202,43 @@ pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *
             irq_manager().register_handler(timer, descriptor).unwrap();
             irq_manager().enable(timer);
         }
-        int => panic!("IRQ is {:?}, only Timer3 and Usb supported", int),
+        int => panic!("IRQ is {:?}, only Usb and Timer3 supported", int),
     }
 }
 
-#[no_mangle]
-pub unsafe fn SetPowerStateOn(nDeviceId: u32) -> i32 {
-    let mut mbox = MBox::new().unwrap();
-    match mbox.set_power_state(nDeviceId, true) {
-        // nDeviceId should be 0x00000003
-        Some(res) => {
-            if res {
-                return 1;
-            } else {
-                info!("ERROR: unable to power on USB hub");
-                return 0;
-            }
-        }
-        None => {
-            info!("ERROR: unable to power on USB hub");
-            return 0;
-        }
-    }
-}
+// #[no_mangle]
+// pub unsafe fn SetPowerStateOn(nDeviceId: u32) -> i32 {
+//     let mut mbox = MBox::new().unwrap();
+//     match mbox.set_power_state(nDeviceId, true) {
+//         // nDeviceId should be 0x00000003
+//         Some(res) => {
+//             if res {
+//                 return 1;
+//             } else {
+//                 info!("ERROR: unable to power on USB hub");
+//                 return 0;
+//             }
+//         }
+//         None => {
+//             info!("ERROR: unable to power on USB hub");
+//             return 0;
+//         }
+//     }
+// }
 
-#[no_mangle]
-pub unsafe fn CancelKernelTimer() {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub unsafe fn StartKernelTimer() {
-    info!("StartKernelTimer()");
-    unimplemented!();
-}
-
-#[no_mangle]
-pub unsafe fn GetMACAddress(ptr: &mut [u8; 6]) {
-    let mut mbox = MBox::new().unwrap();
-    match mbox.mac_address() {
-        Some(raw) => {
-            let raw: [u8; 8] = core::mem::transmute(raw);
-            for i in 0..6 {
-                ptr[i] = raw[i];
-            }
-        }
-        None => *ptr = [0; 6],
-    }
-}
+// #[no_mangle]
+// pub unsafe fn GetMACAddress(ptr: &mut [u8; 6]) {
+//     let mut mbox = MBox::new().unwrap();
+//     match mbox.mac_address() {
+//         Some(raw) => {
+//             let raw: [u8; 8] = core::mem::transmute(raw);
+//             for i in 0..6 {
+//                 ptr[i] = raw[i];
+//             }
+//         }
+//         None => *ptr = [0; 6],
+//     }
+// }
 
 struct USBHandler {
     pub handler: TInterruptHandler,
@@ -252,8 +269,8 @@ impl IRQHandler for USBHandler {
 }
 
 struct TimerHandler {
-    pub handler: Option<Box<dyn Fn(*mut u8) + Send + Sync>>,
-    pub param: Option<Box<Param>>,
+    pub handler: TInterruptHandler,
+    pub param: Option<Param>,
 }
 
 impl TimerHandler {
@@ -263,35 +280,20 @@ impl TimerHandler {
             param: None,
         }
     }
-    pub fn initialize(&self, pHandler: TInterruptHandler, pParam: *mut u8) -> Self {
-        let handler = pHandler.unwrap();
-        let param = Param(pParam);
-
-        info!("Initializing USB Timer Handler");
-
-        Self {
-            param: Some(Box::new(param)),
-            handler: Some(Box::new(move |param| unsafe { handler(param) })),
-        }
+    pub fn initialize(&mut self, pHandler: TInterruptHandler, pParam: *mut u8) {
+        info!("Initializing Timer3 Handler");
+        self.param = Some(Param(pParam));
+        self.handler = pHandler;
     }
 }
 
 impl IRQHandler for TimerHandler {
     fn handle(&self, _e: &mut crate::exception::ExceptionContext) -> Result<(), &'static str> {
-        let handler = self.handler.as_ref().unwrap();
+        let handler = self.handler.unwrap();
         let param = self.param.as_ref().unwrap();
-        (handler)(param.0);
+        unsafe { (handler)(param.0) };
         Ok(())
     }
-}
-
-#[no_mangle]
-pub unsafe fn LogWrite(_pSource: *const u8, _Severity: u32, pMessage: *const u8) {
-    let message = match cstring(pMessage) {
-        Ok(message_string) => message_string,
-        Err(_) => String::from("pMessage sent to DoLogWrite() is not valid UTF-8"),
-    };
-    info!("[USPi Log] {}", message);
 }
 
 #[no_mangle]
@@ -305,7 +307,7 @@ pub unsafe fn DoLogWrite(_pSource: *const u8, _Severity: u32, pMessage: *const u
 
 #[no_mangle]
 pub fn DebugHexdump(_pBuffer: *const c_void, _nBufLen: u32, _pSource: *const u8) {
-    unimplemented!("You don't have to implement this")
+    unimplemented!("Don't Bother")
 }
 
 #[no_mangle]
@@ -393,5 +395,13 @@ impl Usb {
             .as_mut()
             .expect("USB not initialized")
             .recv_frame(frame)
+    }
+
+    pub fn start_kernel_timer(&self, delay: Duration, handler: TKernelTimerHandler) {
+        self.0
+            .lock()
+            .as_mut()
+            .expect("USB not initialized")
+            .start_kernel_timer(delay, handler)
     }
 }

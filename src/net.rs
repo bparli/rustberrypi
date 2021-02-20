@@ -4,10 +4,11 @@ pub mod uspi;
 use alloc::boxed::Box;
 
 pub const USPI_FRAME_BUFFER_SIZE: u32 = 1600;
-pub const MTU: u32 = 1514;
-pub const IP_ADDR: [u8; 4] = [192, 168, 1, 15];
+
+pub const IP_ADDR: [u8; 4] = [169, 254, 32, 10];
 pub const USPI_TIMER_HZ: usize = 10;
 
+use crate::exception;
 use alloc::collections::BTreeMap;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -20,7 +21,7 @@ use smoltcp::socket::{SocketHandle, SocketRef, TcpSocketBuffer};
 use smoltcp::time::Instant;
 use smoltcp::wire::{IpAddress, IpCidr};
 
-use crate::{cpu, info, warn};
+use crate::{bsp, cpu, info, warn};
 use spin::Mutex;
 
 pub type SocketSet = smoltcp::socket::SocketSet<'static, 'static, 'static>;
@@ -32,7 +33,7 @@ pub static ETH: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
 /// 8-byte aligned `u8` slice.
 #[repr(align(8))]
-struct FrameBuf([u8; MTU as usize]);
+struct FrameBuf([u8; USPI_FRAME_BUFFER_SIZE as usize]);
 
 /// A fixed size buffer with length tracking functionality.
 pub struct Frame {
@@ -43,8 +44,8 @@ pub struct Frame {
 impl Frame {
     pub fn new() -> Self {
         Frame {
-            buf: Box::new(FrameBuf([0; MTU as usize])),
-            len: MTU,
+            buf: Box::new(FrameBuf([0; USPI_FRAME_BUFFER_SIZE as usize])),
+            len: USPI_FRAME_BUFFER_SIZE,
         }
     }
 
@@ -61,7 +62,7 @@ impl Frame {
     }
 
     pub fn set_len(&mut self, len: u32) {
-        assert!(len <= MTU as u32);
+        assert!(len <= USPI_FRAME_BUFFER_SIZE as u32);
         self.len = len;
     }
 
@@ -83,7 +84,7 @@ impl<'a> Device<'a> for UsbEthernet {
 
     fn capabilities(&self) -> DeviceCapabilities {
         let mut capability = DeviceCapabilities::default();
-        capability.max_transmission_unit = MTU as usize;
+        capability.max_transmission_unit = USPI_FRAME_BUFFER_SIZE as usize;
         capability
     }
 
@@ -139,7 +140,7 @@ pub fn create_interface() -> EthernetInterface<UsbEthernet> {
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
     let private_cidr = IpCidr::new(
         IpAddress::v4(IP_ADDR[0], IP_ADDR[1], IP_ADDR[2], IP_ADDR[3]),
-        24,
+        16,
     );
     let local_cidr = IpCidr::new(IpAddress::v4(127, 0, 0, 1), 8);
     EthernetInterfaceBuilder::new(device)
@@ -193,14 +194,8 @@ impl EthernetDriver {
     /// See also `smoltcp::iface::EthernetInterface::poll_delay()`.
     fn poll_delay(&mut self, timestamp: Instant) -> Duration {
         match self.ethernet.poll_delay(&self.socket_set, timestamp) {
-            Some(delay) => {
-                info!("EthernetDriver::poll_delay() delay: {:?}", delay);
-                delay.into()
-            }
-            None => {
-                info!("EthernetDriver::poll_delay() delay is None");
-                Duration::from_millis(0)
-            }
+            Some(delay) => delay.into(),
+            None => Duration::from_millis(0),
         }
     }
 
@@ -359,4 +354,16 @@ impl GlobalEthernetDriver {
 
         f(&mut ethernet)
     }
+}
+
+pub extern "C" fn poll_ethernet(_: uspi::TKernelTimerHandle, _: *mut u8, _: *mut u8) {
+    unsafe { exception::asynchronous::local_fiq_unmask() };
+    ETH.poll(Instant::from_millis(
+        bsp::generic_timer().current_time().as_millis() as i64,
+    ));
+    let delay = ETH.poll_delay(Instant::from_millis(
+        bsp::generic_timer().current_time().as_millis() as i64,
+    ));
+    unsafe { exception::asynchronous::local_fiq_mask() };
+    USB.start_kernel_timer(delay, Some(poll_ethernet));
 }

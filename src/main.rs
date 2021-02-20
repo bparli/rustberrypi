@@ -5,13 +5,14 @@
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
 use libkernel::{bsp, cpu, driver, exception, info, memory, net, process, sched, syscall, warn};
 extern crate alloc;
+use core::time::Duration;
 use memory::ALLOCATOR;
 use net::{ETH, USB};
 use sched::SCHEDULER;
 
-static CORE0_TIMER: bsp::device_driver::LocalTimer = unsafe {
-    bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
-};
+// static CORE0_TIMER: bsp::device_driver::LocalTimer = unsafe {
+//     bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
+// };
 
 // Early init code.
 #[no_mangle]
@@ -40,14 +41,6 @@ unsafe fn kernel_init() -> ! {
         memory::heap_end() - memory::heap_start(),
     );
 
-    let mut mbox = crate::bsp::device_driver::MBox::new().unwrap();
-    let serial = mbox.serial_number().expect("Could not get serial number");
-    let mac = mbox.mac_address().expect("Could not get MAC");
-    info!(
-        "Board serial number is {} and mac address is {}",
-        serial, mac
-    );
-
     //Let device drivers register and enable their handlers with the interrupt controller.
     for i in bsp::driver::driver_manager().all_device_drivers() {
         if let Err(msg) = i.register_and_enable_irq_handler() {
@@ -58,7 +51,9 @@ unsafe fn kernel_init() -> ! {
     let (_, privilege_level) = exception::current_privilege_level();
     info!("Current privilege level: {}", privilege_level);
 
-    exception::asynchronous::local_irq_unmask();
+    // need to catch interrupts for USB initialization
+    //exception::asynchronous::local_irq_mask();
+    exception::asynchronous::local_fiq_unmask();
 
     if USB.initialize() {
         info!("Powered on USB hub");
@@ -66,6 +61,14 @@ unsafe fn kernel_init() -> ! {
     } else {
         info!("Unable to initialize Ethernet controller; skipping");
     }
+
+    assert!(USB.is_eth_available());
+    info!("USB get mac {:?}", USB.get_eth_addr());
+    while !USB.is_eth_link_up() {
+        info!("USB ethernet link is not up yet");
+    }
+    //exception::asynchronous::local_irq_unmask();
+    exception::asynchronous::local_fiq_mask();
 
     SCHEDULER.init();
 
@@ -92,11 +95,11 @@ fn kernel_main() -> ! {
     info!("Exception handling state:");
     exception::asynchronous::print_state();
 
-    info!(
-        "Architectural timer resolution: {} ns",
-        //time::time_manager().resolution().as_nanos()
-        CORE0_TIMER.resolution().as_nanos()
-    );
+    // info!(
+    //     "Architectural timer resolution: {} ns",
+    //     //time::time_manager().resolution().as_nanos()
+    //     CORE0_TIMER.resolution().as_nanos()
+    // );
 
     info!("Drivers loaded:");
     for (i, driver) in bsp::driver::driver_manager()
@@ -140,6 +143,14 @@ fn kernel_main() -> ! {
     process::add_user_process(process4);
     process::add_user_process(process2);
     process::add_kernel_process(process3);
+
+    //init_and_register_sys_timer().unwrap();
+
+    USB.start_kernel_timer(Duration::from_millis(1000), Some(net::poll_ethernet));
+
+    unsafe {
+        exception::asynchronous::local_irq_unmask();
+    }
     loop {}
 }
 
@@ -182,3 +193,22 @@ fn process3() {
         cpu::spin_for_cycles(2000000000)
     }
 }
+
+// fn init_and_register_sys_timer() -> Result<(), ()> {
+//     if let Err(msg) = bsp::SYSTEM_TIMER3.init() {
+//         warn!(
+//             "Error initializing IRQ handler for System Timer/Eth poller: {:?}",
+//             msg
+//         );
+//         return Err(());
+//     }
+
+//     if let Err(msg) = bsp::SYSTEM_TIMER3.register_and_enable_irq_handler() {
+//         warn!(
+//             "Error registering IRQ handler for System Timer/Eth poller: {:?}",
+//             msg
+//         );
+//         return Err(());
+//     }
+//     Ok(())
+// }

@@ -2,12 +2,17 @@ use super::{InterruptController, PendingIRQs, PeripheralIRQ};
 use crate::{bsp::device_driver::common::MMIODerefWrapper, exception};
 use register::{mmio::*, register_structs};
 
+// https://tc.gts3.org/cs3210/2020/spring/r/BCM2837-ARM-Peripherals.pdf
 register_structs! {
     #[allow(non_snake_case)]
     WORegisterBlock {
         (0x00 => _reserved1),
+        (0x0C => FIQ_CONTROL: WriteOnly<u32>),
         (0x10 => ENABLE_1: WriteOnly<u32>),
         (0x14 => ENABLE_2: WriteOnly<u32>),
+        (0x18 => ENABLE_BASIC: WriteOnly<u32>),
+        (0x1C => DISABLE_1: WriteOnly<u32>),
+        (0x20 => DISABLE_2: WriteOnly<u32>),
         (0x24 => @END),
     }
 }
@@ -31,6 +36,7 @@ type ReadOnlyRegs = MMIODerefWrapper<RORegisterBlock>;
 type HandlerTable =
     [Option<exception::asynchronous::IRQDescriptor>; InterruptController::NUM_PERIPHERAL_IRQS];
 
+type IRQNumberType = PeripheralIRQ;
 //--------------------------------------------------------------------------------------------------
 // Public Definitions
 //--------------------------------------------------------------------------------------------------
@@ -45,6 +51,9 @@ pub struct PeripheralIC {
 
     /// Stores registered IRQ handlers. Writable only during kernel init. RO afterwards.
     handler_table: spin::RwLock<HandlerTable>,
+
+    // only handling one FIQ anyway
+    fiq_handler: spin::Mutex<Option<exception::asynchronous::IRQDescriptor>>,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -62,6 +71,7 @@ impl PeripheralIC {
             wo_regs: spin::Mutex::new(WriteOnlyRegs::new(base_addr)),
             ro_regs: ReadOnlyRegs::new(base_addr),
             handler_table: spin::RwLock::new([None; InterruptController::NUM_PERIPHERAL_IRQS]),
+            fiq_handler: spin::Mutex::new(None),
         }
     }
 
@@ -111,6 +121,34 @@ impl exception::asynchronous::interface::IRQManager for PeripheralIC {
         enable_reg.set(enable_bit);
     }
 
+    fn disable(&self, int: IRQNumberType) {
+        let regs = &self.wo_regs.lock();
+        let enable_reg = if int.get() <= 31 {
+            &regs.DISABLE_1
+        } else {
+            &regs.DISABLE_2
+        };
+
+        let enable_bit: u32 = 1 << (int.get() % 32);
+        enable_reg.set(enable_bit);
+    }
+
+    fn enable_fiq(&self, int: IRQNumberType) {
+        self.disable(int);
+        let regs = &self.wo_regs.lock();
+        regs.FIQ_CONTROL.set((1 << 7) | (int.get() as u32));
+    }
+
+    fn register_fiq(&self, descriptor: exception::asynchronous::IRQDescriptor) {
+        let mut handler = self.fiq_handler.lock();
+        *handler = Some(descriptor);
+    }
+
+    fn handle_fiq(&self, e: &mut exception::ExceptionContext) {
+        let descriptor = self.fiq_handler.lock().unwrap();
+        descriptor.handler.handle(e).expect("Error handling FIQ");
+    }
+
     fn handle_pending_irqs<'irq_context>(
         &'irq_context self,
         _ic: &exception::asynchronous::IRQContext<'irq_context>,
@@ -125,7 +163,9 @@ impl exception::asynchronous::interface::IRQManager for PeripheralIC {
                 ),
                 Some(descriptor) => {
                     // Call the IRQ handler. Panics on failure.
+                    unsafe { exception::asynchronous::local_fiq_unmask() };
                     descriptor.handler.handle(e).expect("Error handling IRQ");
+                    unsafe { exception::asynchronous::local_fiq_mask() };
                 }
             }
         }
