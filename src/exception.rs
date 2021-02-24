@@ -58,11 +58,11 @@ fn default_exception_handler(e: &ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_synchronous(e: &mut ExceptionContext) {
-    // info!(
-    //     "Exception current_el0_synchronous for proc {:?}, core {}",
-    //     e.tpidr,
-    //     crate::cpu::core_id::<usize>()
-    // );
+    crate::info!(
+        "Exception current_el0_synchronous for proc {:?}, core {}",
+        e.tpidr,
+        crate::cpu::core_id::<usize>()
+    );
     match syscall::handle(e) {
         Ok(()) => {}
         Err(_) => default_exception_handler(e),
@@ -87,6 +87,11 @@ unsafe extern "C" fn current_el0_fiq(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_serror(e: &mut ExceptionContext) {
+    crate::info!(
+        "Exception current_el0_serror for proc {:?}, core {}",
+        e.tpidr,
+        crate::cpu::core_id::<usize>()
+    );
     default_exception_handler(e);
 }
 
@@ -96,6 +101,11 @@ unsafe extern "C" fn current_el0_serror(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
+    crate::info!(
+        "Exception current_elx_synchronous for proc {:?}, core {}",
+        e.tpidr,
+        crate::cpu::core_id::<usize>()
+    );
     default_exception_handler(e);
 }
 
@@ -115,6 +125,11 @@ unsafe extern "C" fn current_elx_fiq(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_elx_serror(e: &mut ExceptionContext) {
+    crate::info!(
+        "Exception current_elx_serror for proc {:?}, core {}",
+        e.tpidr,
+        crate::cpu::core_id::<usize>()
+    );
     default_exception_handler(e);
 }
 

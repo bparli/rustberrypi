@@ -89,8 +89,9 @@ mod inner {
 
         /// Sends an ethernet frame using USPiSendFrame
         pub fn send_frame(&mut self, frame: &Frame) -> Option<i32> {
-            //info!("Send frame {:?}", frame);
+            crate::info!("Uspi Send frame");
             let result = unsafe { USPiSendFrame(frame.as_ptr(), frame.len()) };
+            crate::info!("Send frame AFTER USPiSendFrame");
             match result {
                 0 => None,
                 n => Some(n),
@@ -131,7 +132,7 @@ mod inner {
 pub use inner::USPi;
 
 unsafe fn layout(size: usize) -> Layout {
-    Layout::from_size_align_unchecked(size + core::mem::size_of::<usize>(), 16)
+    Layout::from_size_align(size + core::mem::size_of::<usize>(), 16).unwrap()
 }
 
 #[no_mangle]

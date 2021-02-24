@@ -8,14 +8,13 @@ pub const USPI_FRAME_BUFFER_SIZE: u32 = 1600;
 pub const IP_ADDR: [u8; 4] = [169, 254, 32, 10];
 pub const USPI_TIMER_HZ: usize = 10;
 
-use crate::exception;
-use alloc::collections::BTreeMap;
+use alloc::collections::btree_map::BTreeMap;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 use core::time::Duration;
 
-use smoltcp::iface::{EthernetInterfaceBuilder, NeighborCache};
+use smoltcp::iface::{EthernetInterfaceBuilder, Neighbor, NeighborCache};
 use smoltcp::phy::{self, Device, DeviceCapabilities};
 use smoltcp::socket::{SocketHandle, SocketRef, TcpSocketBuffer};
 use smoltcp::time::Instant;
@@ -24,9 +23,9 @@ use smoltcp::wire::{IpAddress, IpCidr};
 use crate::{bsp, cpu, info, warn};
 use spin::Mutex;
 
-pub type SocketSet = smoltcp::socket::SocketSet<'static, 'static, 'static>;
+pub type SocketSet = smoltcp::socket::SocketSet<'static>;
 pub type TcpSocket = smoltcp::socket::TcpSocket<'static>;
-pub type EthernetInterface<T> = smoltcp::iface::EthernetInterface<'static, 'static, 'static, T>;
+pub type EthernetInterface<T> = smoltcp::iface::EthernetInterface<'static, T>;
 
 pub static USB: uspi::Usb = uspi::Usb::uninitialized();
 pub static ETH: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
@@ -85,15 +84,17 @@ impl<'a> Device<'a> for UsbEthernet {
     fn capabilities(&self) -> DeviceCapabilities {
         let mut capability = DeviceCapabilities::default();
         capability.max_transmission_unit = USPI_FRAME_BUFFER_SIZE as usize;
+        capability.max_burst_size = Some(1);
         capability
     }
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
+        info!("UsbEthernet receive");
         let mut frame = Frame::new();
         match USB.recv_frame(&mut frame) {
             Some(_) => {
                 let rx = RxToken { frame };
-                let tx = TxToken;
+                let tx = TxToken {};
                 Some((rx, tx))
             }
             _ => None,
@@ -101,6 +102,7 @@ impl<'a> Device<'a> for UsbEthernet {
     }
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
+        info!("UsbEthernet TRANSMIT");
         Some(TxToken)
     }
 }
@@ -125,6 +127,7 @@ impl phy::TxToken for TxToken {
     where
         F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
     {
+        info!("phy::TxToken for TxToken consume");
         let mut frame = Frame::new();
         frame.set_len(len.try_into().unwrap());
         let result = f(frame.as_mut_slice());
@@ -135,9 +138,10 @@ impl phy::TxToken for TxToken {
 
 /// Creates and returns a new ethernet interface using `UsbEthernet` struct.
 pub fn create_interface() -> EthernetInterface<UsbEthernet> {
+    info!("CREATE interface for smoltcp");
     let device = UsbEthernet;
     let hw_addr = USB.get_eth_addr();
-    let neighbor_cache = NeighborCache::new(BTreeMap::new());
+
     let private_cidr = IpCidr::new(
         IpAddress::v4(IP_ADDR[0], IP_ADDR[1], IP_ADDR[2], IP_ADDR[3]),
         16,
@@ -145,7 +149,7 @@ pub fn create_interface() -> EthernetInterface<UsbEthernet> {
     let local_cidr = IpCidr::new(IpAddress::v4(127, 0, 0, 1), 8);
     EthernetInterfaceBuilder::new(device)
         .ethernet_addr(hw_addr)
-        .neighbor_cache(neighbor_cache)
+        .neighbor_cache(NeighborCache::new(BTreeMap::new()))
         .ip_addrs([private_cidr, local_cidr])
         .finalize()
 }
@@ -357,13 +361,11 @@ impl GlobalEthernetDriver {
 }
 
 pub extern "C" fn poll_ethernet(_: uspi::TKernelTimerHandle, _: *mut u8, _: *mut u8) {
-    unsafe { exception::asynchronous::local_fiq_unmask() };
     ETH.poll(Instant::from_millis(
         bsp::generic_timer().current_time().as_millis() as i64,
     ));
     let delay = ETH.poll_delay(Instant::from_millis(
         bsp::generic_timer().current_time().as_millis() as i64,
     ));
-    unsafe { exception::asynchronous::local_fiq_mask() };
     USB.start_kernel_timer(delay, Some(poll_ethernet));
 }
