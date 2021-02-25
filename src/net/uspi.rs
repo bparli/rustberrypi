@@ -89,9 +89,7 @@ mod inner {
 
         /// Sends an ethernet frame using USPiSendFrame
         pub fn send_frame(&mut self, frame: &Frame) -> Option<i32> {
-            crate::info!("Uspi Send frame");
             let result = unsafe { USPiSendFrame(frame.as_ptr(), frame.len()) };
-            crate::info!("Send frame AFTER USPiSendFrame");
             match result {
                 0 => None,
                 n => Some(n),

@@ -8,7 +8,6 @@ pub const USPI_FRAME_BUFFER_SIZE: u32 = 1600;
 pub const IP_ADDR: [u8; 4] = [169, 254, 32, 10];
 pub const USPI_TIMER_HZ: usize = 10;
 
-use alloc::collections::btree_map::BTreeMap;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryInto;
@@ -16,7 +15,6 @@ use core::time::Duration;
 
 use smoltcp::iface::{EthernetInterfaceBuilder, Neighbor, NeighborCache};
 use smoltcp::phy::{self, Device, DeviceCapabilities};
-use smoltcp::socket::{SocketHandle, SocketRef, TcpSocketBuffer};
 use smoltcp::time::Instant;
 use smoltcp::wire::{IpAddress, IpCidr};
 
@@ -28,7 +26,7 @@ pub type TcpSocket = smoltcp::socket::TcpSocket<'static>;
 pub type EthernetInterface<T> = smoltcp::iface::EthernetInterface<'static, T>;
 
 pub static USB: uspi::Usb = uspi::Usb::uninitialized();
-pub static ETH: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
+//pub static ETH: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
 /// 8-byte aligned `u8` slice.
 #[repr(align(8))]
@@ -137,49 +135,65 @@ impl phy::TxToken for TxToken {
 }
 
 /// Creates and returns a new ethernet interface using `UsbEthernet` struct.
-pub fn create_interface() -> EthernetInterface<UsbEthernet> {
+fn create_interface() -> EthernetInterface<UsbEthernet> {
     info!("CREATE interface for smoltcp");
     let device = UsbEthernet;
     let hw_addr = USB.get_eth_addr();
 
-    let private_cidr = IpCidr::new(
-        IpAddress::v4(IP_ADDR[0], IP_ADDR[1], IP_ADDR[2], IP_ADDR[3]),
-        16,
-    );
-    let local_cidr = IpCidr::new(IpAddress::v4(127, 0, 0, 1), 8);
-    EthernetInterfaceBuilder::new(device)
-        .ethernet_addr(hw_addr)
-        .neighbor_cache(NeighborCache::new(BTreeMap::new()))
-        .ip_addrs([private_cidr, local_cidr])
-        .finalize()
+    unsafe {
+        ETH.private_cidr = Some(IpCidr::new(
+            IpAddress::v4(IP_ADDR[0], IP_ADDR[1], IP_ADDR[2], IP_ADDR[3]),
+            16,
+        ));
+        ETH.local_cidr = Some(IpCidr::new(IpAddress::v4(127, 0, 0, 1), 8));
+
+        let neighbor_cache = NeighborCache::new(&mut ETH.neighbor_cache_storage.as_mut()[..]);
+
+        EthernetInterfaceBuilder::new(device)
+            .ethernet_addr(hw_addr)
+            .neighbor_cache(neighbor_cache)
+            .ip_addrs([ETH.private_cidr.unwrap(), ETH.local_cidr.unwrap()])
+            .finalize()
+    }
 }
 
 const PORT_MAP_SIZE: usize = 65536 / 64;
 
+pub static mut ETH: EthernetDriver = EthernetDriver {
+    socket_set: None,
+    ethernet: None,
+    neighbor_cache_storage: [None; 16],
+    private_cidr: None,
+    local_cidr: None,
+};
+
 pub struct EthernetDriver {
     /// A set of sockets
-    socket_set: SocketSet,
-    /// Bitmap to track the port usage
-    port_map: [u64; PORT_MAP_SIZE],
+    socket_set: Option<SocketSet>,
     /// Internal ethernet interface
-    ethernet: EthernetInterface<UsbEthernet>,
+    ethernet: Option<Mutex<EthernetInterface<UsbEthernet>>>,
+
+    neighbor_cache_storage: [Option<(IpAddress, Neighbor)>; 16],
+
+    private_cidr: Option<IpCidr>,
+
+    local_cidr: Option<IpCidr>,
 }
 
 impl EthernetDriver {
     /// Creates a fresh ethernet driver.
-    fn new() -> EthernetDriver {
-        EthernetDriver {
-            socket_set: SocketSet::new(Vec::new()),
-            port_map: [0; PORT_MAP_SIZE],
-            ethernet: create_interface(),
-        }
+    pub fn initialize(&mut self) {
+        self.ethernet = Some(Mutex::new(create_interface()));
+        self.socket_set = Some(SocketSet::new(Vec::new()));
     }
 
     /// Polls the ethernet interface.
     /// See also `smoltcp::iface::EthernetInterface::poll()`.
-    fn poll(&mut self, timestamp: Instant) {
+    pub fn poll(&mut self, timestamp: Instant) {
         info!("EthernetDriver::poll() timestamp: {:?}", timestamp);
-        match self.ethernet.poll(&mut self.socket_set, timestamp) {
+        let mut eth = self.ethernet.as_mut().unwrap().lock();
+        info!("EthernetDriver::poll() timestamp: {:?}", timestamp);
+        match eth.poll(&mut self.socket_set.as_mut().unwrap(), timestamp) {
             Ok(packets_processed) => {
                 if packets_processed {
                     info!("EthernetDriver::poll() packets processed");
@@ -196,176 +210,23 @@ impl EthernetDriver {
 
     /// Returns an advisory wait time to call `poll()` the next time.
     /// See also `smoltcp::iface::EthernetInterface::poll_delay()`.
-    fn poll_delay(&mut self, timestamp: Instant) -> Duration {
-        match self.ethernet.poll_delay(&self.socket_set, timestamp) {
+    pub fn poll_delay(&mut self, timestamp: Instant) -> Duration {
+        let eth = self.ethernet.as_ref().unwrap().lock();
+        match eth.poll_delay(&self.socket_set.as_ref().unwrap(), timestamp) {
             Some(delay) => delay.into(),
             None => Duration::from_millis(0),
         }
     }
-
-    /// Marks a port as used. Returns `Some(port)` on success, `None` on failure.
-    pub fn mark_port(&mut self, port: u16) -> Option<u16> {
-        let port_map_index = port as usize / 64;
-        let entry_bit_shift = port as u64 % 64;
-        if (self.port_map[port_map_index] & (1 << entry_bit_shift)) >> entry_bit_shift == 0 {
-            self.port_map[port_map_index] |= 1 << entry_bit_shift;
-            info!("EthernetDriver::mark_port(): port {} marked", port);
-            Some(port)
-        } else {
-            info!(
-                "! EthernetDriver::mark_port(): port {} already marked",
-                port
-            );
-            None
-        }
-    }
-
-    /// Clears used bit of a port. Returns `Some(port)` on success, `None` on failure.
-    pub fn erase_port(&mut self, port: u16) -> Option<u16> {
-        let port_map_index = port as usize / 64;
-        let entry_bit_shift = port as u64 % 64;
-        if (self.port_map[port_map_index] & (1 << entry_bit_shift)) >> entry_bit_shift == 1 {
-            self.port_map[port_map_index] &= !(1 << entry_bit_shift);
-            info!("EthernetDriver::erase_port(): port {} freed", port);
-            Some(port)
-        } else {
-            info!("! EthernetDriver::erase_port(): port {} already free", port);
-            None
-        }
-    }
-
-    /// Returns the first open port between the ephemeral port range 49152 ~ 65535.
-    /// Note that this function does not mark the returned port.
-    pub fn get_ephemeral_port(&mut self) -> Option<u16> {
-        for port_map_index in 768..1024 {
-            let first_unset_bit = (!self.port_map[port_map_index]).trailing_zeros();
-            if first_unset_bit < 64 {
-                let port = (port_map_index as u16 * 64) + first_unset_bit as u16;
-                info!(
-                    "EthernetDriver::get_ephemeral_port(): port {} available",
-                    port
-                );
-                return Some(port);
-            }
-        }
-        info!("! EthernetDriver::get_ephemeral_port(): no ephemeral ports free");
-        None
-    }
-
-    /// Finds a socket with a `SocketHandle`.
-    pub fn get_socket(&mut self, handle: SocketHandle) -> SocketRef<'_, TcpSocket> {
-        self.socket_set.get::<TcpSocket>(handle)
-    }
-
-    /// This function creates a new TCP socket, adds it to the internal socket
-    /// set, and returns the `SocketHandle` of the new socket.
-    pub fn add_socket(&mut self) -> SocketHandle {
-        let rx_buffer = TcpSocketBuffer::new(vec![0; 16384]);
-        let tx_buffer = TcpSocketBuffer::new(vec![0; 16384]);
-        let tcp_socket = TcpSocket::new(rx_buffer, tx_buffer);
-        self.socket_set.add(tcp_socket)
-    }
-
-    /// Releases a socket from the internal socket set.
-    pub fn release(&mut self, handle: SocketHandle) {
-        self.socket_set.release(handle);
-    }
-
-    /// Prunes the internal socket set.
-    pub fn prune(&mut self) {
-        self.socket_set.prune();
-    }
-}
-
-/// A thread-safe wrapper for `EthernetDriver`.
-pub struct GlobalEthernetDriver(Mutex<Option<EthernetDriver>>);
-
-impl GlobalEthernetDriver {
-    pub const fn uninitialized() -> GlobalEthernetDriver {
-        GlobalEthernetDriver(Mutex::new(None))
-    }
-
-    pub fn initialize(&self) {
-        let mut lock = self.0.lock();
-        *lock = Some(EthernetDriver::new());
-    }
-
-    pub fn poll(&self, timestamp: Instant) {
-        if cpu::core_id::<usize>() == 0 {
-            self.0
-                .lock()
-                .as_mut()
-                .expect("Uninitialized EthernetDriver")
-                .poll(timestamp)
-        }
-    }
-
-    pub fn poll_delay(&self, timestamp: Instant) -> Duration {
-        self.0
-            .lock()
-            .as_mut()
-            .expect("Uninitialized EthernetDriver")
-            .poll_delay(timestamp)
-    }
-
-    pub fn mark_port(&self, port: u16) -> Option<u16> {
-        self.0
-            .lock()
-            .as_mut()
-            .expect("Uninitialized EthernetDriver")
-            .mark_port(port)
-    }
-
-    pub fn get_ephemeral_port(&self) -> Option<u16> {
-        self.0
-            .lock()
-            .as_mut()
-            .expect("Uninitialized EthernetDriver")
-            .get_ephemeral_port()
-    }
-
-    pub fn add_socket(&self) -> SocketHandle {
-        self.0
-            .lock()
-            .as_mut()
-            .expect("Uninitialized EthernetDriver")
-            .add_socket()
-    }
-
-    /// Enters a critical region and execute the provided closure with a mutable
-    /// reference to the socket.
-    pub fn with_socket<F, R>(&self, handle: SocketHandle, f: F) -> R
-    where
-        F: FnOnce(&mut SocketRef<'_, TcpSocket>) -> R,
-    {
-        let mut guard = self.0.lock();
-        let mut socket = guard
-            .as_mut()
-            .expect("Uninitialized EthernetDriver")
-            .get_socket(handle);
-
-        f(&mut socket)
-    }
-
-    /// Enters a critical region and execute the provided closure with a mutable
-    /// reference to the inner ethernet driver.
-    pub fn critical<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut EthernetDriver) -> R,
-    {
-        let mut guard = self.0.lock();
-        let mut ethernet = guard.as_mut().expect("Uninitialized EthernetDriver");
-
-        f(&mut ethernet)
-    }
 }
 
 pub extern "C" fn poll_ethernet(_: uspi::TKernelTimerHandle, _: *mut u8, _: *mut u8) {
-    ETH.poll(Instant::from_millis(
-        bsp::generic_timer().current_time().as_millis() as i64,
-    ));
-    let delay = ETH.poll_delay(Instant::from_millis(
-        bsp::generic_timer().current_time().as_millis() as i64,
-    ));
-    USB.start_kernel_timer(delay, Some(poll_ethernet));
+    unsafe {
+        ETH.poll(Instant::from_millis(
+            bsp::generic_timer().current_time().as_millis() as i64,
+        ));
+        let delay = ETH.poll_delay(Instant::from_millis(
+            bsp::generic_timer().current_time().as_millis() as i64,
+        ));
+        USB.start_kernel_timer(delay, Some(poll_ethernet));
+    }
 }
