@@ -28,6 +28,7 @@ For more convenient development, copy `/ext/kernel8.img` to sd boot partition an
 * User level kernel level processes/tasks
 * Syscalls suport (only exit and sleep for now)
 * Multi-core
+* Ethernet
 
 ## Acknowledgements
 

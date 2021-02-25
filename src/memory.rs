@@ -35,6 +35,7 @@ pub mod map {
     pub const GPIO_OFFSET:                              usize =        0x0020_0000;
     pub const UART_OFFSET:                              usize =        0x0020_1000;
     pub const SYS_TIMER_OFFSET:                         usize =        0x0000_3000;
+    pub const MINI_UART_OFFSET:                         usize =        0x0021_5000;
 
     /// Physical devices.
     pub mod mmio {
@@ -44,9 +45,15 @@ pub mod map {
         pub const PERIPHERAL_INTERRUPT_CONTROLLER_BASE: usize = BASE + 0x0000_B200;
         pub const GPIO_BASE:                            usize = BASE + GPIO_OFFSET;
         pub const PL011_UART_BASE:                      usize = BASE + UART_OFFSET;
+        pub const MINI_UART_BASE:                       usize = BASE + MINI_UART_OFFSET;
         pub const SYS_TIMER_BASE:                       usize = BASE + SYS_TIMER_OFFSET;
         pub const LOCAL_INTERRUPT_CONTROLLER_BASE:      usize =        0x4000_0000;
         pub const END_INCLUSIVE:                        usize =        0x4000_FFFF;
+    }
+
+    pub mod virt {
+        pub const DMA_HEAP_START:      usize =             0x0020_0000;
+        pub const DMA_HEAP_END:        usize =             0x005F_FFFF;
     }
 }
 
@@ -85,7 +92,7 @@ pub mod kernel_mem_range {
     impl Default for AttributeFields {
         fn default() -> AttributeFields {
             AttributeFields {
-                mem_attributes: MemAttributes::CacheableDRAM,
+                mem_attributes: MemAttributes::NonCacheableDRAM,
                 acc_perms: AccessPermissions::ReadWrite,
                 execute_never: true,
             }
@@ -95,7 +102,7 @@ pub mod kernel_mem_range {
     pub struct Descriptor {
         pub name: &'static str,
         pub virtual_range: fn() -> RangeInclusive<usize>,
-        pub translation: Translation,
+        //pub translation: Translation,
         pub attribute_fields: AttributeFields,
     }
 }
@@ -104,7 +111,7 @@ pub mod kernel_mem_range {
 // Public Definitions
 //--------------------------------------------------------------------------------------------------
 
-const NUM_MEM_RANGES: usize = 2;
+const NUM_MEM_RANGES: usize = 3;
 
 /// The virtual memory layout.
 ///
@@ -144,6 +151,16 @@ pub static LAYOUT: KernelVirtualLayout<{ NUM_MEM_RANGES }> = KernelVirtualLayout
                 mem_attributes: MemAttributes::CacheableDRAM,
                 acc_perms: AccessPermissions::ReadOnly,
                 execute_never: false,
+            },
+        },
+        RangeDescriptor {
+            name: "DMA heap pool",
+            virtual_range: || RangeInclusive::new(heap_start(), heap_end()),
+            translation: Translation::Identity,
+            attribute_fields: AttributeFields {
+                mem_attributes: MemAttributes::NonCacheableDRAM,
+                acc_perms: AccessPermissions::ReadWrite,
+                execute_never: true,
             },
         },
         RangeDescriptor {
@@ -193,6 +210,20 @@ pub fn heap_map() -> Option<(usize, usize)> {
         return Some((binary_end, (mem_start + mem_size) as usize));
     }
     None
+}
+
+pub fn heap_start() -> usize {
+    match heap_map() {
+        Some((heap_start, _)) => heap_start,
+        None => map::virt::DMA_HEAP_START,
+    }
+}
+
+pub fn heap_end() -> usize {
+    match heap_map() {
+        Some((_, heap_end)) => heap_end,
+        None => map::virt::DMA_HEAP_END,
+    }
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -16,12 +16,15 @@ static PL011_UART: device_driver::PL011Uart = unsafe {
     )
 };
 
-pub static SYSTEM_TIMER: device_driver::SystemTimer = unsafe {
-    device_driver::SystemTimer::new(
-        memory::map::mmio::SYS_TIMER_BASE,
-        exception::asynchronous::irq_map::SYSTEM_TIMER,
-    )
-};
+pub static MINI_UART: device_driver::MiniUart =
+    unsafe { device_driver::MiniUart::new(memory::map::mmio::MINI_UART_BASE) };
+
+// pub static SYSTEM_TIMER3: device_driver::SystemTimer = unsafe {
+//     device_driver::SystemTimer::new(
+//         memory::map::mmio::SYS_TIMER_BASE,
+//         exception::asynchronous::irq_map::SYSTEM_TIMER3,
+//     )
+// };
 
 // get an instance to the generic system timer
 // for reading time

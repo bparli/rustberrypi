@@ -58,7 +58,7 @@ fn default_exception_handler(e: &ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_el0_synchronous(e: &mut ExceptionContext) {
-    // info!(
+    // crate::info!(
     //     "Exception current_el0_synchronous for proc {:?}, core {}",
     //     e.tpidr,
     //     crate::cpu::core_id::<usize>()
@@ -78,7 +78,20 @@ unsafe extern "C" fn current_el0_irq(e: &mut ExceptionContext) {
 }
 
 #[no_mangle]
+unsafe extern "C" fn current_el0_fiq(e: &mut ExceptionContext) {
+    //crate::info!("Exception current_el0_fiq for proc {:?}", e.tpidr);
+    use exception::asynchronous::interface::IRQManager;
+    let token = &exception::asynchronous::IRQContext::new();
+    bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
+}
+
+#[no_mangle]
 unsafe extern "C" fn current_el0_serror(e: &mut ExceptionContext) {
+    crate::info!(
+        "Exception current_el0_serror for proc {:?}, core {}",
+        e.tpidr,
+        crate::cpu::core_id::<usize>()
+    );
     default_exception_handler(e);
 }
 
@@ -88,20 +101,35 @@ unsafe extern "C" fn current_el0_serror(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
+    // crate::info!(
+    //     "Exception current_elx_synchronous for proc {:?}, core {}",
+    //     e.tpidr,
+    //     crate::cpu::core_id::<usize>()
+    // );
     default_exception_handler(e);
 }
 
 #[no_mangle]
 unsafe extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
     use exception::asynchronous::interface::IRQManager;
-    //info!("Exception current_elx_irq for proc {:?}", e.tpidr);
-
     let token = &exception::asynchronous::IRQContext::new();
     bsp::exception::asynchronous::irq_manager().handle_pending_irqs(token, e);
 }
 
 #[no_mangle]
+unsafe extern "C" fn current_elx_fiq(e: &mut ExceptionContext) {
+    //crate::info!("Exception current_elx_fiq for proc {:?}", e.tpidr);
+    use exception::asynchronous::interface::IRQManager;
+    bsp::exception::asynchronous::irq_manager().handle_fiq(e);
+}
+
+#[no_mangle]
 unsafe extern "C" fn current_elx_serror(e: &mut ExceptionContext) {
+    crate::info!(
+        "Exception current_elx_serror for proc {:?}, core {}",
+        e.tpidr,
+        crate::cpu::core_id::<usize>()
+    );
     default_exception_handler(e);
 }
 
@@ -116,6 +144,11 @@ unsafe extern "C" fn lower_aarch64_synchronous(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn lower_aarch64_irq(e: &mut ExceptionContext) {
+    default_exception_handler(e);
+}
+
+#[no_mangle]
+unsafe extern "C" fn lower_aarch64_fiq(e: &mut ExceptionContext) {
     default_exception_handler(e);
 }
 
@@ -135,6 +168,11 @@ unsafe extern "C" fn lower_aarch32_synchronous(e: &mut ExceptionContext) {
 
 #[no_mangle]
 unsafe extern "C" fn lower_aarch32_irq(e: &mut ExceptionContext) {
+    default_exception_handler(e);
+}
+
+#[no_mangle]
+unsafe extern "C" fn lower_aarch32_fiq(e: &mut ExceptionContext) {
     default_exception_handler(e);
 }
 

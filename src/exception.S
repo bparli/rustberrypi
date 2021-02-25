@@ -70,7 +70,7 @@ __exception_vector_start:
 .org 0x080
     CALL_WITH_CONTEXT current_el0_irq
 .org 0x100
-    FIQ_SUSPEND
+    CALL_WITH_CONTEXT current_el0_fiq
 .org 0x180
     CALL_WITH_CONTEXT current_el0_serror
 
@@ -80,7 +80,7 @@ __exception_vector_start:
 .org 0x280
     CALL_WITH_CONTEXT current_elx_irq
 .org 0x300
-    FIQ_SUSPEND
+    CALL_WITH_CONTEXT current_elx_fiq
 .org 0x380
     CALL_WITH_CONTEXT current_elx_serror
 
@@ -90,7 +90,7 @@ __exception_vector_start:
 .org 0x480
     CALL_WITH_CONTEXT lower_aarch64_irq
 .org 0x500
-    FIQ_SUSPEND
+    CALL_WITH_CONTEXT lower_aarch64_fiq
 .org 0x580
     CALL_WITH_CONTEXT lower_aarch64_serror
 
@@ -100,7 +100,7 @@ __exception_vector_start:
 .org 0x680
     CALL_WITH_CONTEXT lower_aarch32_irq
 .org 0x700
-    FIQ_SUSPEND
+    CALL_WITH_CONTEXT lower_aarch32_fiq
 .org 0x780
     CALL_WITH_CONTEXT lower_aarch32_serror
 .org 0x800

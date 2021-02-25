@@ -32,12 +32,14 @@ endif
 QEMU_MISSING_STRING = "This board is not yet supported for QEMU."
 
 RUSTFLAGS          = -C link-arg=-T$(LINKER_FILE) $(RUSTC_MISC_ARGS)
+RUSTFLAGS_ETH      = $(RUSTFLAGS) -C link-arg=-L.cargo -C link-arg=-luspi -C link-arg=-luspienv
 RUSTFLAGS_PEDANTIC = $(RUSTFLAGS) -D warnings
 
 FEATURES      = bsp_$(BSP)
 COMPILER_ARGS = --target=$(TARGET) --release
 
 RUSTC_CMD   = cargo rustc $(COMPILER_ARGS)
+#RUSTC_CMD	= cargo xbuild --release --verbose
 CLIPPY_CMD  = cargo clippy $(COMPILER_ARGS)
 CHECK_CMD   = cargo check $(COMPILER_ARGS)
 TEST_CMD    = cargo test $(COMPILER_ARGS)
@@ -72,13 +74,19 @@ endif
 EXEC_QEMU     = $(QEMU_BINARY) -M $(QEMU_MACHINE_TYPE)
 EXEC_MINIPUSH = ruby ./utils/minipush.rb
 
-.PHONY: all $(KERNEL_ELF) $(KERNEL_BIN) doc qemu test chainboot gdb gdb-opt0 \
-    clippy clean readelf objdump nm check
+.PHONY: all $(KERNEL_ELF) $(KERNEL_BIN) qemu test chainboot gdb gdb-opt0 \
+    clippy clean readelf objdump nm check uspi
 
 all: $(KERNEL_BIN)
 
+uspi:
+	@(cd ext/uspi/lib; make clean && make)
+	cp -f ext/uspi/lib/libuspi.a ./.cargo
+	@(cd ext/uspi/env/lib; make clean && make)
+	cp -f ext/uspi/env/lib/libuspienv.a ./.cargo
+
 $(KERNEL_ELF):
-	RUSTFLAGS="$(RUSTFLAGS)" $(RUSTC_CMD)
+	RUSTFLAGS="$(RUSTFLAGS_ETH)" $(RUSTC_CMD)
 
 $(KERNEL_BIN): $(KERNEL_ELF)
 	@$(OBJCOPY_CMD) $(KERNEL_ELF) $(KERNEL_BIN)

@@ -29,6 +29,13 @@ pub mod interface {
         /// Enable an interrupt in the controller.
         fn enable(&self, irq_number: Self::IRQNumberType);
 
+        fn disable(&self, int: Self::IRQNumberType);
+
+        fn enable_fiq(&self, int: Self::IRQNumberType);
+
+        fn register_fiq(&self, descriptor: super::IRQDescriptor);
+
+        fn handle_fiq(&self, _e: &mut super::ExceptionContext);
         /// Handle pending interrupts.
         ///
         /// This function is called directly from the CPU's IRQ exception vector. On AArch64,

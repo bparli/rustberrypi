@@ -1,12 +1,14 @@
-[target.'cfg(target_os = "none")']
-runner = "target/kernel_test_runner.sh"
-
 [build]
 target = "aarch64-unknown-none"
 
 [target.aarch64-unknown-none]
+runner = "./qemu.sh"
 rustflags = [
     "-C", "target-cpu=cortex-a53",
-    "-C", "link-arg=--script=./src/link.ld",
+    "-C", "link-arg=--script=src/link.ld",
     "-C", "link-arg=--no-dynamic-linker",
+
+    "-C", "link-arg=-L.cargo",
+    "-C", "link-arg=-luspi",
+    "-C", "link-arg=-luspienv",
 ]

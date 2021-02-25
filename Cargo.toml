@@ -15,7 +15,7 @@ cortex-a = { version = "3.0.x" }
 register = { version = "0.5.x", features=["no_std_unit_tests"] }
 spin = "0.5"
 linked_list_allocator = "0.8"
-
+smoltcp = { version = "0.7", default-features = false, features = ["alloc", "ethernet", "socket-tcp", "proto-ipv4", "log", "verbose"] }
 
 ##--------------------------------------------------------------------------------------------------
 ## Testing

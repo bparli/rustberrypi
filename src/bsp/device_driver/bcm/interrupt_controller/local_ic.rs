@@ -85,6 +85,12 @@ impl exception::asynchronous::interface::IRQManager for LocalIC {
         self.registers.core_timer_interrupt_control[cpu::core_id::<usize>()].set(enable_bit);
     }
 
+    // keep the trait happy
+    fn enable_fiq(&self, _irq: Self::IRQNumberType) {}
+    fn disable(&self, _irq: Self::IRQNumberType) {}
+    fn register_fiq(&self, _descriptor: exception::asynchronous::IRQDescriptor) {}
+    fn handle_fiq(&self, _e: &mut exception::ExceptionContext) {}
+
     fn handle_pending_irqs<'irq_context>(
         &'irq_context self,
         _ic: &exception::asynchronous::IRQContext<'irq_context>,
@@ -94,10 +100,17 @@ impl exception::asynchronous::interface::IRQManager for LocalIC {
         for irq_number in self.get_pending() {
             let core_handler_table = handler_tables[cpu::core_id::<usize>()];
             match core_handler_table[irq_number] {
-                None => panic!(
-                    "Local Interrupt Controller: No handler registered for IRQ {}",
-                    irq_number
-                ),
+                None => {
+                    // check if from gpu first
+                    if irq_number == 8 {
+                        crate::info!("Local Interrupt Controller: IRQ 8 fired");
+                    } else {
+                        panic!(
+                            "Local Interrupt Controller: No handler registered for IRQ {}",
+                            irq_number
+                        )
+                    }
+                }
                 Some(descriptor) => {
                     // Call the IRQ handler. Panics on failure.
                     descriptor.handler.handle(e).expect("Error handling IRQ");

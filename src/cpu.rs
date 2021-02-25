@@ -1,5 +1,6 @@
 use crate::{bsp, exception, runtime_init};
 use core::ptr::{read_volatile, write_volatile};
+use core::sync::atomic::{AtomicUsize, Ordering};
 use cortex_a::{asm, regs::*};
 
 /// Used by `arch` code to find the early boot core.
@@ -28,9 +29,17 @@ static CORE3_TIMER: bsp::device_driver::LocalTimer = unsafe {
     bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
 };
 
-//--------------------------------------------------------------------------------------------------
-// Public Code
-//--------------------------------------------------------------------------------------------------
+pub struct Coordinator(AtomicUsize);
+pub static CORE_COORD: Coordinator = Coordinator(AtomicUsize::new(0));
+
+impl Coordinator {
+    pub fn set_ready_and_wait(&self) {
+        let _current_count = self.0.fetch_add(1, Ordering::AcqRel);
+        while self.0.load(Ordering::Acquire) < 4 {
+            asm::nop();
+        }
+    }
+}
 
 /// Return the executing core's id.
 #[inline(always)]
@@ -100,6 +109,11 @@ unsafe fn el2_to_el1() {
 
         // Set EL1 execution state to AArch64.
         HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64);
+
+        // can't use softfloat anymore since we're using uspi
+        // enable floating point and SVE (SIMD) (A53: 4.3.38, 4.3.34)
+        runtime_init::CPTR_EL2.set(0);
+        runtime_init::CPACR_EL1.set(runtime_init::CPACR_EL1.get() | (0b11 << 20));
 
         // Set SCTLR to known state
         runtime_init::SCTLR_EL1.set(runtime_init::SCTLR_EL1::RES1);
@@ -200,6 +214,11 @@ unsafe fn kmain2() -> ! {
     write_volatile(SPINNING_BASE.add(core_id::<usize>()), 0);
     memory::mmu::core_setup();
 
+    exception::asynchronous::local_fiq_mask();
+    exception::asynchronous::local_irq_mask();
+
+    // wait for shceduler to be initialized by core 0 before starting timers
+    CORE_COORD.set_ready_and_wait();
     init_core_timer();
     exception::asynchronous::local_irq_unmask();
     loop {}

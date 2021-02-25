@@ -3,14 +3,13 @@
 #![no_std]
 
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-use libkernel::{bsp, cpu, driver, exception, info, memory, process, sched, syscall, warn};
+use libkernel::{bsp, cpu, driver, exception, info, memory, net, process, sched, syscall, warn};
 extern crate alloc;
+use core::time::Duration;
+use cpu::CORE_COORD;
 use memory::ALLOCATOR;
+use net::{ETH, USB};
 use sched::SCHEDULER;
-
-static CORE0_TIMER: bsp::device_driver::LocalTimer = unsafe {
-    bsp::device_driver::LocalTimer::new(bsp::exception::asynchronous::irq_map::LOCAL_TIMER)
-};
 
 // Early init code.
 #[no_mangle]
@@ -24,18 +23,20 @@ unsafe fn kernel_init() -> ! {
 
     // finally working
     cpu::wake_up_secondary_cores();
-
     // enable the core's mmu
     memory::mmu::core_setup();
 
+    // init all the drivers
     for i in bsp::driver::driver_manager().all_device_drivers().iter() {
         if i.init().is_err() {
             panic!("Error loading driver: {}", i.compatible())
         }
     }
 
-    bsp::driver::driver_manager().post_device_driver_init();
-    //println! is usable from here on.
+    ALLOCATOR.lock().init(
+        memory::heap_start(),
+        memory::heap_end() - memory::heap_start(),
+    );
 
     //Let device drivers register and enable their handlers with the interrupt controller.
     for i in bsp::driver::driver_manager().all_device_drivers() {
@@ -47,17 +48,25 @@ unsafe fn kernel_init() -> ! {
     let (_, privilege_level) = exception::current_privilege_level();
     info!("Current privilege level: {}", privilege_level);
 
-    if let Err(mssg) = CORE0_TIMER.register_and_enable_irq_handler() {
-        warn!("Error registering IRQ handler: {}", mssg);
+    // need to catch interrupts for USB initialization
+    exception::asynchronous::local_fiq_unmask();
+
+    if USB.initialize() {
+        info!("Powered on USB hub");
+        ETH.initialize();
+    } else {
+        info!("Unable to initialize Ethernet controller; skipping");
     }
 
-    let (heap_start, heap_end) = memory::heap_map().expect("failed to derive heap map");
-    ALLOCATOR.lock().init(heap_start, heap_end - heap_start);
-
-    // Unmask interrupts on the boot CPU core.
-    exception::asynchronous::local_irq_unmask();
+    assert!(USB.is_eth_available());
+    info!("USB get mac {:?}", USB.get_eth_addr());
+    while !USB.is_eth_link_up() {
+        info!("USB ethernet link is not up yet");
+    }
+    exception::asynchronous::local_fiq_mask();
 
     SCHEDULER.init();
+    CORE_COORD.set_ready_and_wait();
 
     kernel_main()
 }
@@ -77,12 +86,6 @@ fn kernel_main() -> ! {
 
     info!("Exception handling state:");
     exception::asynchronous::print_state();
-
-    info!(
-        "Architectural timer resolution: {} ns",
-        //time::time_manager().resolution().as_nanos()
-        CORE0_TIMER.resolution().as_nanos()
-    );
 
     info!("Drivers loaded:");
     for (i, driver) in bsp::driver::driver_manager()
@@ -120,41 +123,39 @@ fn kernel_main() -> ! {
         Rc::strong_count(&cloned_reference)
     );
 
-    for _ in 0..=5 {
-        process::add_user_process(process1);
+    for _ in 0..3 {
+        process::add_user_process(process);
     }
-    process::add_user_process(process4);
     process::add_user_process(process2);
     process::add_kernel_process(process3);
+
+    USB.start_kernel_timer(Duration::from_millis(1000), Some(net::poll_ethernet));
+
+    unsafe {
+        exception::asynchronous::local_irq_unmask();
+    }
     loop {}
 }
 
 static mut PROC_NUM: i32 = 1;
-fn process1() {
+fn process() {
     unsafe {
         let my_proc = PROC_NUM;
         PROC_NUM += 1;
         loop {
             info!(
-                "forked proc numero uno {} {}",
-                cpu::core_id::<usize>(),
-                my_proc
+                "forked proc numero {} from core {}",
+                my_proc,
+                cpu::core_id::<usize>()
             );
-            syscall::sleep(3500);
+            syscall::sleep(1500);
         }
-    }
-}
-
-fn process4() {
-    loop {
-        info!("forked proc numero quatro {} ", cpu::core_id::<usize>());
-        syscall::sleep(2000);
     }
 }
 
 fn process2() {
     for _ in 0..=5 {
-        info!("forked proc dos {} ", cpu::core_id::<usize>());
+        info!("forked proc dos from core {} ", cpu::core_id::<usize>());
         syscall::sleep(2000);
     }
 
@@ -164,7 +165,7 @@ fn process2() {
 
 fn process3() {
     loop {
-        info!("forked kernel proc {}", cpu::core_id::<usize>());
+        info!("forked kernel proc from core {}", cpu::core_id::<usize>());
         cpu::spin_for_cycles(2000000000)
     }
 }

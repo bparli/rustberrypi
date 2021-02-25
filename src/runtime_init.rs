@@ -154,6 +154,11 @@ defreg!(
     ]
 );
 
+// (ref: D7.2.19 Architectural Feature Trap Register EL2)
+defreg!(CPTR_EL2);
+// (ref: D7.2.18 Architectural Feature Access Control Register)
+defreg!(CPACR_EL1);
+
 //--------------------------------------------------------------------------------------------------
 // Testing
 //--------------------------------------------------------------------------------------------------
